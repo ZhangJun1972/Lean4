@@ -13,7 +13,7 @@ opaque myOpaqueBool : Bool
 
 /--
 error: `decide_cbv` failed: could not reduce the expression to a boolean value; got stuck at: ⏎
-  decide (myOpaqueBool = true)
+  myOpaqueBool
 -/
 #guard_msgs (error) in
 example : myOpaqueBool = true := by decide_cbv
