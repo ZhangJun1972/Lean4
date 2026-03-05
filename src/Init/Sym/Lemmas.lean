@@ -36,6 +36,12 @@ theorem ite_true {α : Sort u} (c : Prop) {inst : Decidable c} (a b : α) {ht : 
 theorem ite_false {α : Sort u} (c : Prop) {inst : Decidable c} (a b : α) {ht : ¬ c} : @ite α c inst a b = b := by
   simp [*]
 
+theorem ite_of_decide_eq_true {α : Sort u} (c : Prop) {inst : Decidable c} (a b : α) {ht : decide c = true} : @ite α c inst a b = a := by
+  simp_all
+
+theorem ite_of_decide_eq_false {α : Sort u} (c : Prop) {inst : Decidable c} (a b : α) {ht : decide c = false} : @ite α c inst a b = b := by
+  simp_all
+
 theorem dite_true {α : Sort u} (c : Prop) {inst : Decidable c} (a : c → α) (b : ¬ c → α) {ht : c} : @dite α c inst a b = a ht := by
   simp [*]
 

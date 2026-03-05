@@ -77,9 +77,25 @@ def simpIteDecidable (f α c inst a b : Expr) (fallback : SimpM Result) : SimpM 
 
 /-- Simplify the `Decidable` instance, then try `simpIteDecidable`. -/
 def simpIteDecidableWithFallback (f α c inst a b : Expr) (fallback : SimpM Result) : SimpM Result := do
-  match (← simp inst) with
-  | .rfl _ => simpIteDecidable f α c inst a b fallback
-  | .step inst' _ _ => simpIteDecidable f α c inst' a b fallback
+  let reduced ← Tactic.Cbv.withCbvOpaqueGuard <| project? inst 0
+  match reduced with
+  | some reduced =>
+    let decide := mkApp2 (mkConst ``decide) c inst
+    let reduced ← share reduced
+    let refl := mkApp2 (.const ``Eq.refl [1]) (mkConst ``Bool) reduced
+    let result ← simp reduced
+    let result ← mkEqTransResult decide reduced refl result
+    let .step bool hbool _ := result | unreachable!
+    match_expr bool with
+    | Bool.true =>
+      return .step a <| mkApp6 (mkConst ``Sym.ite_of_decide_eq_true f.constLevels!) α c inst a b hbool
+    | Bool.false =>
+      return .step b <| mkApp6 (mkConst ``Sym.ite_of_decide_eq_false f.constLevels!) α c inst a b hbool
+    | _ => fallback
+  | none =>
+    match (← simp inst) with
+    | .rfl _ => simpIteDecidable f α c inst a b fallback
+    | .step inst' _ _ => simpIteDecidable f α c inst' a b fallback
 
 /-- Like `simpIte` but also evaluates `Decidable.decide` when the condition does not
 reduce to `True`/`False` directly. -/
@@ -125,9 +141,29 @@ def simpDIteDecidable (f α c inst a b : Expr) (fallback : SimpM Result) : SimpM
 
 /-- Simplify the `Decidable` instance, then try `simpDIteDecidable`. -/
 def simpDIteDecidableWithFallback (f α c inst a b : Expr) (fallback : SimpM Result) : SimpM Result := do
-  match (← simp inst) with
-  | .rfl _ => simpDIteDecidable f α c inst a b fallback
-  | .step inst' _ _ => simpDIteDecidable f α c inst' a b fallback
+  let reduced ← Tactic.Cbv.withCbvOpaqueGuard <| project? inst 0
+  match reduced with
+  | some reduced =>
+    let decide := mkApp2 (mkConst ``decide) c inst
+    let reduced ← share reduced
+    let refl := mkApp2 (.const ``Eq.refl [1]) (mkConst ``Bool) reduced
+    let result ← simp reduced
+    let result ← mkEqTransResult decide reduced refl result
+    let .step bool hbool _ := result | unreachable!
+    match_expr bool with
+    | Bool.true =>
+      let h ← shareCommon <| mkApp3 (mkConst ``of_decide_eq_true) c inst hbool
+      let a' ← share <| a.betaRev #[h]
+      return .step a' <| mkApp6 (mkConst ``Sym.dite_true f.constLevels!) α c inst a b h
+    | Bool.false =>
+      let h ← shareCommon <| mkApp3 (mkConst ``of_decide_eq_false) c inst hbool
+      let b' ← share <| b.betaRev #[h]
+      return .step b' <| mkApp6 (mkConst ``Sym.dite_false f.constLevels!) α c inst a b h
+    | _ => fallback
+  | none =>
+    match (← simp inst) with
+    | .rfl _ => simpDIteDecidable f α c inst a b fallback
+    | .step inst' _ _ => simpDIteDecidable f α c inst' a b fallback
 
 /-- Like `simpDIte` but also evaluates `Decidable.decide` when the condition does not
 reduce to `True`/`False` directly. -/
