@@ -399,6 +399,10 @@ static void lean_del_core(object * o, object * & todo) {
             if (object * v = lean_to_ref(o)->m_value) dec(v, todo);
             lean_free_small_object(o);
             break;
+        case LeanLocalRef:
+            if (object * v = lean_to_local_ref(o)->m_value) dec(v, todo);
+            lean_free_small_object(o);
+            break;
         case LeanTask:
             deactivate_task(lean_to_task(o));
             break;
@@ -585,6 +589,9 @@ extern "C" LEAN_EXPORT void lean_mark_persistent(object * o) {
                 case LeanRef:
                     if (object * v = lean_to_ref(o)->m_value) todo.push_back(v);
                     break;
+                case LeanLocalRef:
+                    lean_internal_panic("Attempted to mark thread local reference as persistent");
+                    break;
                 default:
                     lean_unreachable();
                     break;
@@ -659,6 +666,9 @@ extern "C" LEAN_EXPORT void lean_mark_mt(object * o) {
                     break;
                 case LeanRef:
                     if (object * v = lean_to_ref(o)->m_value) todo.push_back(v);
+                    break;
+                case LeanLocalRef:
+                    lean_internal_panic("Attempted to mark thread local reference as multi-threaded");
                     break;
                 default:
                     lean_unreachable();

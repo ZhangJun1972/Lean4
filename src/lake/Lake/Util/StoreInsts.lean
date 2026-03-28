@@ -11,6 +11,7 @@ public import Lean.Data.NameMap.Basic
 public import Lake.Util.RBArray
 public import Lake.Util.Family
 public import Lake.Util.Store
+public import Std.Sync.Basic
 
 open Lean
 namespace Lake
@@ -20,6 +21,10 @@ public instance {cmp : κ → κ → Ordering} [Monad m] [Std.LawfulEqCmp cmp] :
   store k a := modify (·.insert k a)
 
 public instance {cmp : κ → κ → Ordering} [MonadLiftT (ST ω) m] [Monad m] [Std.LawfulEqCmp cmp] : MonadDStore κ β (StateRefT' ω (Std.DTreeMap κ β cmp) m) where
+  fetch? k := return (← get).get? k
+  store k a := modify (·.insert k a)
+
+public instance {cmp : κ → κ → Ordering} [MonadLiftT (ST IO.RealWorld) m] [Monad m] [Std.LawfulEqCmp cmp] : MonadDStore κ β (Std.AtomicT (Std.DTreeMap κ β cmp) m) where
   fetch? k := return (← get).get? k
   store k a := modify (·.insert k a)
 
@@ -36,6 +41,10 @@ public instance [Monad m] : MonadStore Name α (StateT (NameMap α) m) where
   store k a := modify (·.insert k a)
 
 public instance [MonadLiftT (ST ω) m] [Monad m] : MonadStore Name α (StateRefT' ω (NameMap α) m) where
+  fetch? k := return (← get).find? k
+  store k a := modify (·.insert k a)
+
+public instance [MonadLiftT (ST IO.RealWorld) m] [Monad m] : MonadStore Name α (Std.AtomicT (NameMap α) m) where
   fetch? k := return (← get).find? k
   store k a := modify (·.insert k a)
 
