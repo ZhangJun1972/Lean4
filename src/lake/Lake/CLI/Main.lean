@@ -83,6 +83,7 @@ public structure LakeOptions where
   profileRate : Nat := 1000
   profileOutput? : Option String := none
   profileRaw : Bool := false
+  profileNoServe : Bool := false
 
 def LakeOptions.outLv (opts : LakeOptions) : LogLevel :=
   opts.outLv?.getD opts.verbosity.minLogLv
@@ -333,6 +334,7 @@ def lakeLongOption : (opt : String) → CliM PUnit
   let p ← takeOptArg "--output" "output path"
   modifyThe LakeOptions ({· with profileOutput? := some p})
 | "--raw" => modifyThe LakeOptions ({· with profileRaw := true})
+| "--no-serve" => modifyThe LakeOptions ({· with profileNoServe := true})
 -- Shared options
 | "--force" => modifyThe LakeOptions ({· with shake.force := true})
 -- Shake options
@@ -1126,7 +1128,7 @@ protected def profile : CliM PUnit := do
   let exe ← parseExeTargetSpec ws exeSpec
   let exeFile ← ws.runBuild exe.fetch (mkBuildConfig opts)
   let _ ← Profile.run exeFile.toString opts.subArgs.toArray opts.profileOutput? opts.profileRate
-    (raw := opts.profileRaw)
+    (raw := opts.profileRaw) (serve := !opts.profileNoServe)
   exit 0
 
 protected def lean : CliM PUnit := do

@@ -262,6 +262,7 @@ else()
     "${LEAN_SOURCE_DIR}/../tests/lake/examples/test.sh"
     "${LEAN_SOURCE_DIR}/../tests/lake/tests/shake/test.sh"
     "${LEAN_SOURCE_DIR}/../tests/lake/tests/builtin-lint/test.sh"
+    "${LEAN_SOURCE_DIR}/../tests/lake/tests/profile/test.sh"
   )
 endif()
 foreach(T ${LEANLAKETESTS})
