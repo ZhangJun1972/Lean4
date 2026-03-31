@@ -14,8 +14,18 @@ Author: Leonardo de Moura
 #include "runtime/exception.h"
 #include "util/alloc.h"
 
-#ifndef LEAN_WINDOWS
+#ifdef LEAN_WINDOWS
+#include <psapi.h>
+#else
 #include <sys/mman.h>
+#include <dlfcn.h>
+#endif
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
+#elif !defined(LEAN_WINDOWS)
+#include <link.h>
 #endif
 
 #define LEAN_COMPACTOR_INIT_SZ 1024*1024
@@ -57,9 +67,88 @@ struct object_compactor::max_sharing_table {
     }
 };
 
+std::vector<lib_info> get_loaded_libs() {
+    std::vector<lib_info> libs;
+#ifdef LEAN_WINDOWS
+    HANDLE proc = GetCurrentProcess();
+    std::vector<HMODULE> mods(128);
+    DWORD needed;
+    if (!EnumProcessModules(proc, mods.data(), mods.size() * sizeof(HMODULE), &needed))
+        return libs;
+    unsigned n = needed / sizeof(HMODULE);
+    if (n > mods.size()) {
+        mods.resize(n);
+        if (!EnumProcessModules(proc, mods.data(), mods.size() * sizeof(HMODULE), &needed))
+            return libs;
+    } else {
+        mods.resize(n);
+    }
+    for (HMODULE h : mods) {
+        MODULEINFO mi;
+        if (!GetModuleInformation(proc, h, &mi, sizeof(mi))) continue;
+        char path[MAX_PATH];
+        if (!GetModuleFileNameA(h, path, sizeof(path))) continue;
+        libs.push_back({reinterpret_cast<size_t>(mi.lpBaseOfDll), mi.SizeOfImage, path});
+    }
+#elif defined(__APPLE__)
+    uint32_t n = _dyld_image_count();
+    for (uint32_t i = 0; i < n; i++) {
+        const struct mach_header * hdr = _dyld_get_image_header(i);
+        if (!hdr) continue;
+        intptr_t slide = _dyld_get_image_vmaddr_slide(i);
+        const char * name = _dyld_get_image_name(i);
+        if (!name) continue;
+        // Compute loaded size from segments
+        size_t img_size = 0;
+        if (hdr->magic == MH_MAGIC_64) {
+            const struct mach_header_64 * hdr64 = reinterpret_cast<const struct mach_header_64 *>(hdr);
+            const uint8_t * p = reinterpret_cast<const uint8_t *>(hdr64 + 1);
+            for (uint32_t j = 0; j < hdr64->ncmds; j++) {
+                const struct load_command * cmd = reinterpret_cast<const struct load_command *>(p);
+                if (cmd->cmd == LC_SEGMENT_64) {
+                    const struct segment_command_64 * seg = reinterpret_cast<const struct segment_command_64 *>(cmd);
+                    size_t end = seg->vmaddr + seg->vmsize;
+                    if (end > img_size) img_size = end;
+                }
+                p += cmd->cmdsize;
+            }
+        }
+        libs.push_back({reinterpret_cast<size_t>(hdr), img_size, name});
+    }
+#else
+    // Linux: use dl_iterate_phdr
+    dl_iterate_phdr([](struct dl_phdr_info * info, size_t, void * data) -> int {
+        auto * libs = static_cast<std::vector<lib_info> *>(data);
+        size_t base = info->dlpi_addr;
+        size_t img_size = 0;
+        for (int i = 0; i < info->dlpi_phnum; i++) {
+            if (info->dlpi_phdr[i].p_type == PT_LOAD) {
+                size_t end = info->dlpi_phdr[i].p_vaddr + info->dlpi_phdr[i].p_memsz;
+                if (end > img_size) img_size = end;
+            }
+        }
+        const char * name = info->dlpi_name;
+        libs->push_back({base, img_size, name ? name : ""});
+        return 0;
+    }, &libs);
+#endif
+    std::sort(libs.begin(), libs.end(), [](lib_info const & a, lib_info const & b) { return a.base < b.base; });
+    return libs;
+}
+
+std::vector<lib_info> object_compactor::closure_libs() const {
+    if (!m_has_closures) return {};
+    return m_libs;
+}
+
+std::vector<lib_info> const & object_compactor::all_libs() const {
+    return m_libs;
+}
+
 object_compactor::object_compactor(void * base_addr, std::vector<compacted_region *> dep_regions):
     m_max_sharing_table(new max_sharing_table(this)),
     m_dep_regions(std::move(dep_regions)),
+    m_libs(get_loaded_libs()),
     m_base_addr(base_addr),
     m_begin(malloc(LEAN_COMPACTOR_INIT_SZ)),
     m_end(m_begin),
@@ -283,6 +372,25 @@ bool object_compactor::insert_task(object * o) {
     return true;
 }
 
+bool object_compactor::insert_closure(object * o) {
+    m_has_closures = true;
+    auto & offsets = m_tmp;
+    bool missing = false;
+    unsigned n = lean_closure_num_fixed(o);
+    offsets.resize(n);
+    for (unsigned i = n; i-- > 0;) {
+        offsets[i] = to_offset(lean_closure_arg_cptr(o)[i]);
+        if (offsets[i] == g_null_offset) missing = true;
+    }
+    if (missing) return false;
+    object * r = copy_object(o);
+    for (unsigned i = 0; i < n; i++)
+        lean_closure_arg_cptr(r)[i] = offsets[i];
+    // m_fun is a raw code pointer — relocated on read via lib table
+    save(o, r);
+    return true;
+}
+
 bool object_compactor::insert_promise(object * o) {
     object * t = (object *)lean_to_promise(o)->m_result;
     object_offset c = to_offset(t);
@@ -386,7 +494,7 @@ void object_compactor::operator()(object * o) {
             g_tag_counters[lean_ptr_tag(curr)]++;
 #endif
             switch (lean_ptr_tag(curr)) {
-            case LeanClosure:         throw exception("closures cannot be compacted. One possible cause of this error is trying to store a function in a persistent environment extension.");
+            case LeanClosure:         r = insert_closure(curr); break;
             case LeanArray:           r = insert_array(curr); break;
             case LeanScalarArray:     insert_sarray(curr); break;
             case LeanString:          insert_string(curr); break;
@@ -408,7 +516,8 @@ void object_compactor::operator()(object * o) {
 }
 
 compacted_region::compacted_region(size_t sz, void * data, void * base_addr, bool is_mmap, std::function<void()> free_data,
-                                   std::vector<compacted_region *> dep_regions):
+                                   std::string fname, std::vector<compacted_region *> dep_regions,
+                                   std::vector<std::pair<size_t, ptrdiff_t>> lib_relocs):
     m_size(sz),
     m_base_addr(base_addr),
     m_is_mmap(is_mmap),
@@ -416,7 +525,9 @@ compacted_region::compacted_region(size_t sz, void * data, void * base_addr, boo
     m_begin(data),
     m_next(data),
     m_end(static_cast<char*>(data)+sz),
-    m_dep_regions(std::move(dep_regions)) {
+    m_fname(std::move(fname)),
+    m_dep_regions(std::move(dep_regions)),
+    m_lib_relocs(std::move(lib_relocs)) {
     // Sort dep regions by base_addr for binary search in fix_object_ptr
     std::sort(m_dep_regions.begin(), m_dep_regions.end(),
               [](compacted_region * a, compacted_region * b) { return a->base_addr() < b->base_addr(); });
@@ -515,22 +626,64 @@ void compacted_region::fix_mpz(object * o) {
 #endif
 }
 
+void compacted_region::fix_closure(object * o) {
+    // Fix captured object pointers
+    object ** it = lean_closure_arg_cptr(o);
+    object ** end = it + lean_closure_num_fixed(o);
+    for (; it != end; it++)
+        *it = fix_object_ptr(*it);
+    // Relocate function pointer via sorted lib reloc table
+    if (!m_lib_relocs.empty()) {
+        size_t fn = reinterpret_cast<size_t>(lean_closure_fun(o));
+        // Binary search: find last entry with old_base <= fn
+        auto upper = std::upper_bound(m_lib_relocs.begin(), m_lib_relocs.end(), fn,
+            [](size_t addr, std::pair<size_t, ptrdiff_t> const & e) { return addr < e.first; });
+        if (upper != m_lib_relocs.begin()) {
+            auto & [old_base, delta] = *(upper - 1);
+            if (delta != 0)
+                lean_to_closure(o)->m_fun = reinterpret_cast<void*>(static_cast<ptrdiff_t>(fn) + delta);
+        }
+    }
+    move(o);
+}
+
 object * compacted_region::read() {
     if (m_next == m_end)
         return nullptr; /* all objects have been read */
 
     object * root = fix_object_ptr(*static_cast<object_offset *>(m_next));
     move(sizeof(object_offset));
-    if (m_begin == m_base_addr) {
-        // Check if all dep regions also need no relocation
-        bool all_at_base = true;
-        for (compacted_region * dep : m_dep_regions) {
-            if (dep->begin() != dep->base_addr()) { all_at_base = false; break; }
+    {
+        // Check if any closure fn ptr relocation is actually needed
+        bool needs_fn_reloc = false;
+        for (auto const & [_, delta] : m_lib_relocs) {
+            if (delta != 0) { needs_fn_reloc = true; break; }
         }
-        if (all_at_base) {
-            // no relocations needed
-            m_end = m_next;
-            return root;
+        if (m_begin == m_base_addr && !needs_fn_reloc) {
+            // Check if all dep regions also need no relocation
+            bool all_deps_at_base = true;
+            for (compacted_region * dep : m_dep_regions) {
+                if (dep->begin() != dep->base_addr()) { all_deps_at_base = false; break; }
+            }
+            if (all_deps_at_base) {
+                // no relocations needed
+                m_end = m_next;
+                return root;
+            }
+        }
+        // When closures need relocation but data was mmap'd at the right address, we need
+        // to copy to a writable buffer for the fn ptr fixups.
+        if (m_is_mmap && m_begin == m_base_addr && needs_fn_reloc) {
+            void * buf = malloc(m_size);
+            memcpy(buf, m_begin, m_size);
+            root = reinterpret_cast<object*>(static_cast<char*>(buf) + (reinterpret_cast<char*>(root) - static_cast<char*>(m_begin)));
+            if (m_free_data) m_free_data();
+            m_begin = buf;
+            m_next = static_cast<char*>(buf) + sizeof(object_offset);
+            m_end = static_cast<char*>(buf) + m_size;
+            m_is_mmap = false;
+            size_t sz = m_size;
+            m_free_data = [=]() { free_sized(buf, sz); };
         }
     }
     lean_assert(!m_is_mmap);
@@ -542,7 +695,7 @@ object * compacted_region::read() {
             fix_constructor(curr);
         } else {
             switch (tag) {
-            case LeanClosure:         lean_unreachable();
+            case LeanClosure:         fix_closure(curr); break;
             case LeanArray:           fix_array(curr); break;
             case LeanScalarArray:     move(lean_sarray_byte_size(curr)); break;
             case LeanString:          move(lean_string_byte_size(curr)); break;

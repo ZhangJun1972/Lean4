@@ -22,6 +22,7 @@ Authors: Leonardo de Moura, Gabriel Ebner, Sebastian Ullrich
 #include "runtime/compact.h"
 #include "runtime/buffer.h"
 #include "runtime/string_ref.h"
+#include "runtime/array_ref.h"
 #include "util/io.h"
 #include "util/name_map.h"
 #include "library/module.h"
@@ -78,7 +79,9 @@ struct olean_header {
     // 5 bytes: magic number
     char marker[5] = {'o', 'l', 'e', 'a', 'n'};
     // 1 byte: version, incremented on structural changes to header
-    uint8_t version = 2;
+    // v2: original format
+    // v3: dep region file paths and lib relocation table stored after header
+    uint8_t version = 3;
     // 1 byte of flags:
     // * bit 0: whether persisted bignums use GMP or Lean-native encoding
     // * bit 1-7: reserved
@@ -98,7 +101,14 @@ struct olean_header {
     char githash[40];
     // address at which the beginning of the file (including header) is attempted to be mmapped
     size_t base_addr;
-    // payload, a serialize Lean object graph; `size_t` has same alignment requirements as Lean objects
+    // In v3+, the fixed header is followed by:
+    //   uint32_t num_deps
+    //   num_deps × (uint32_t path_len, char path[path_len])
+    //   uint32_t num_libs                               // closure fn ptr relocation table
+    //   num_libs × (size_t base, uint32_t path_len, char path[path_len])
+    //   padding to size_t alignment
+    // Then the compacted data.
+    // In v2, the compacted data starts immediately after the header.
     size_t data[];
 };
 // make sure we don't have any padding bytes, which also ensures `data` is properly aligned
@@ -143,6 +153,57 @@ static std::vector<compacted_region *> extract_dep_regions(b_obj_arg odep_region
         result.push_back(reinterpret_cast<compacted_region *>(lean_unbox_usize(lean_array_get_core(odep_regions, i))));
     }
     return result;
+}
+
+// --- Lib table helpers for closure fn ptr relocation ---
+
+static void write_lib_table(std::ostream & out, std::vector<lib_info> const & libs) {
+    uint32_t n = libs.size();
+    out.write(reinterpret_cast<char const *>(&n), sizeof(n));
+    for (auto const & lib : libs) {
+        out.write(reinterpret_cast<char const *>(&lib.base), sizeof(lib.base));
+        uint32_t len = lib.path.size();
+        out.write(reinterpret_cast<char const *>(&len), sizeof(len));
+        out.write(lib.path.data(), len);
+    }
+}
+
+static size_t lib_table_size(std::vector<lib_info> const & libs) {
+    size_t sz = sizeof(uint32_t); // num_libs
+    for (auto const & lib : libs) {
+        sz += sizeof(size_t) + sizeof(uint32_t) + lib.path.size();
+    }
+    return sz;
+}
+
+
+static std::vector<std::pair<size_t, ptrdiff_t>> read_lib_table_from_fd(int fd, size_t & bytes_read) {
+    std::vector<std::pair<size_t, ptrdiff_t>> relocs;
+    uint32_t n;
+    if (read(fd, &n, sizeof(n)) != sizeof(n)) return relocs;
+    bytes_read += sizeof(n);
+    if (n == 0) return relocs;
+    auto current_libs = get_loaded_libs();
+    for (uint32_t i = 0; i < n; i++) {
+        size_t old_base;
+        if (read(fd, &old_base, sizeof(old_base)) != sizeof(old_base)) break;
+        uint32_t len;
+        if (read(fd, &len, sizeof(len)) != sizeof(len)) break;
+        std::string path(len, '\0');
+        if (read(fd, &path[0], len) != static_cast<ssize_t>(len)) break;
+        bytes_read += sizeof(old_base) + sizeof(len) + len;
+        size_t new_base = 0;
+        for (auto const & lib : current_libs) {
+            if (lib.path == path) {
+                new_base = lib.base;
+                break;
+            }
+        }
+        ptrdiff_t delta = static_cast<ptrdiff_t>(new_base) - static_cast<ptrdiff_t>(old_base);
+        relocs.push_back({old_base, delta});
+    }
+    std::sort(relocs.begin(), relocs.end());
+    return relocs;
 }
 
 extern "C" LEAN_EXPORT object * lean_save_module_data_incr(b_obj_arg ofname, b_obj_arg mod, b_obj_arg odata,
@@ -196,26 +257,92 @@ extern "C" LEAN_EXPORT object * lean_save_module_data_incr(b_obj_arg ofname, b_o
     try {
         std::ofstream out(olean_tmp_fn, std::ios_base::binary);
 
+        // Collect dep file paths: import dep regions + last prior part (transitivity handles the rest)
+        std::vector<std::string> dep_paths;
+        for (compacted_region * dep : compactor.dep_regions()) {
+            dep_paths.push_back(dep->fname());
+        }
+        if (!compactor.written_fnames().empty()) {
+            dep_paths.push_back(compactor.written_fnames().back());
+        }
+
+        // Compact the module data first so we know if closures are present
+        // (need to know for header extension size calculation)
+        // Actually, we need to reserve space before compacting. So we compact,
+        // then compute sizes, then write. But the compactor buffer grows, and
+        // we need to know the file_offset before compacting.
+        //
+        // Solution: compact first with a tentative header size, then adjust.
+        // Or: assume closures might be present and always reserve space for the
+        // lib table. Since the lib table is only written when has_closures(),
+        // we can compute its size from the pre-built m_libs table.
+        // Actually, m_libs is built once in the constructor. We can compute
+        // the lib table size upfront (worst case: all libs). If no closures
+        // end up being compacted, we write num_libs=0.
+
+        // Compute extension size: dep table + lib table (worst case: all libs).
+        // We reserve for the full lib table upfront since m_libs is fixed at construction
+        // and we don't know until after compaction whether closures appear.
+        size_t dep_table_size = sizeof(uint32_t); // num_deps
+        for (std::string const & path : dep_paths) {
+            dep_table_size += sizeof(uint32_t) + path.size();
+        }
+        // Reserve for full lib table (worst case — all loaded libraries)
+        size_t max_lib_table = lib_table_size(compactor.all_libs());
+        // At minimum, num_libs=0 (4 bytes)
+        if (max_lib_table < sizeof(uint32_t)) max_lib_table = sizeof(uint32_t);
+        size_t ext_size = dep_table_size + max_lib_table;
+        size_t ext_padded = ext_size;
+        if (ext_padded % sizeof(size_t) != 0) {
+            ext_padded += sizeof(size_t) - (ext_padded % sizeof(size_t));
+        }
+
+        // Align compactor buffer for this file's portion
         if (compactor.size() % ALIGN != 0) {
             compactor.alloc(ALIGN - (compactor.size() % ALIGN));
         }
         size_t file_offset = compactor.size();
 
-        compactor.alloc(sizeof(olean_header));
-        // see/sync with file format description above
+        // Reserve space in compactor for header + extension (so base_addr offsets are correct)
+        compactor.alloc(sizeof(olean_header) + ext_padded);
+
+        // Compact the module data
+        compactor(odata);
+
+        // Write header
         olean_header header = {};
         header.base_addr = reinterpret_cast<size_t>(compactor.base_addr()) + file_offset;
         strncpy(header.lean_version, get_short_version_string().c_str(), sizeof(header.lean_version));
         strncpy(header.githash, LEAN_GITHASH, sizeof(header.githash));
         out.write(reinterpret_cast<char *>(&header), sizeof(header));
 
-        compactor(odata);
+        // Write dep table
+        uint32_t num_deps = static_cast<uint32_t>(dep_paths.size());
+        out.write(reinterpret_cast<char const *>(&num_deps), sizeof(num_deps));
+        for (std::string const & path : dep_paths) {
+            uint32_t path_len = static_cast<uint32_t>(path.size());
+            out.write(reinterpret_cast<char const *>(&path_len), sizeof(path_len));
+            out.write(path.data(), path_len);
+        }
+
+        // Always write the full lib table (all loaded libraries) so the
+        // reserved extension size matches what the reader will parse.
+        write_lib_table(out, compactor.all_libs());
+
+        // Write padding to fill reserved extension space
+        size_t written_ext = dep_table_size + lib_table_size(compactor.all_libs());
+        if (written_ext < ext_padded) {
+            size_t padding = ext_padded - written_ext;
+            std::vector<char> zeros(padding, 0);
+            out.write(zeros.data(), padding);
+        }
 
         if (out.fail()) {
             throw exception((sstream() << "failed to create file '" << olean_fn << "'").str());
         }
-        out.write(static_cast<char const *>(compactor.data()) + file_offset + sizeof(olean_header),
-                  compactor.size() - file_offset - sizeof(olean_header));
+        size_t data_offset = file_offset + sizeof(olean_header) + ext_padded;
+        out.write(static_cast<char const *>(compactor.data()) + data_offset,
+                  compactor.size() - data_offset);
         out.close();
     } catch (exception & ex) {
         std::remove(olean_tmp_fn.c_str());
@@ -243,118 +370,185 @@ extern "C" LEAN_EXPORT object * lean_save_module_data_incr(b_obj_arg ofname, b_o
         return io_result_mk_error((sstream() << "failed to write '" << olean_fn << "': " << errno << " " << strerror(errno)).str());
     }
 
+    compactor.add_written_fname(std::string(olean_fn));
     return io_result_mk_ok(cs_obj.steal());
 }
 
-extern "C" LEAN_EXPORT object * lean_read_module_data_incr(b_obj_arg ofname, b_obj_arg odep_regions, object *) {
-    char const * olean_fn = lean_string_cstr(ofname);
-    std::vector<compacted_region *> dep_regions = extract_dep_regions(odep_regions);
-
-    try {
+// Loads a file and its deps recursively. Appends (region, root_object) pairs to `out`,
+// deps first, self last. Returns the compacted_region for this file.
+static compacted_region * read_module_data_incr_core(
+        std::string const & olean_fn,
+        std::vector<std::pair<compacted_region *, object *>> & out) {
 #ifdef LEAN_WINDOWS
-        // `FILE_SHARE_DELETE` is necessary to allow the file to (be marked to) be deleted while in use
-        HANDLE h_file = CreateFile(olean_fn, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (h_file == INVALID_HANDLE_VALUE) {
-            return io_result_mk_error((sstream() << "failed to open file '" << olean_fn << "': " << GetLastError()).str());
-        }
-        int raw_fd = _open_osfhandle((intptr_t)h_file, _O_RDONLY);
-        if (raw_fd == -1) {
-            CloseHandle(h_file);
-            return io_result_mk_error((sstream() << "failed to convert handle to fd for '" << olean_fn << "'").str());
-        }
-        file_descriptor fd(raw_fd);
+    HANDLE h_file = CreateFile(olean_fn.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h_file == INVALID_HANDLE_VALUE) {
+        throw exception((sstream() << "failed to open file '" << olean_fn << "': " << GetLastError()).str());
+    }
+    int raw_fd = _open_osfhandle((intptr_t)h_file, _O_RDONLY);
+    if (raw_fd == -1) {
+        CloseHandle(h_file);
+        throw exception((sstream() << "failed to convert handle to fd for '" << olean_fn << "'").str());
+    }
+    file_descriptor fd(raw_fd);
 #else
-        file_descriptor fd(open(olean_fn, O_RDONLY));
-        if (!fd) {
-            return io_result_mk_error((sstream() << "failed to open file '" << olean_fn << "': " << strerror(errno)).str());
-        }
+    file_descriptor fd(open(olean_fn.c_str(), O_RDONLY));
+    if (!fd) {
+        throw exception((sstream() << "failed to open file '" << olean_fn << "': " << strerror(errno)).str());
+    }
 #endif
 
-        struct stat st;
-        if (fstat(fd.get(), &st) == -1) {
-            return io_result_mk_error((sstream() << "failed to stat file '" << olean_fn << "': " << strerror(errno)).str());
-        }
-        size_t size = st.st_size;
+    struct stat st;
+    if (fstat(fd.get(), &st) == -1) {
+        throw exception((sstream() << "failed to stat file '" << olean_fn << "': " << strerror(errno)).str());
+    }
+    size_t size = st.st_size;
 
-        olean_header default_header = {};
-        olean_header header;
-        if (read(fd.get(), &header, sizeof(header)) != sizeof(header)
-            || memcmp(header.marker, default_header.marker, sizeof(header.marker)) != 0) {
-            return io_result_mk_error((sstream() << "failed to read file '" << olean_fn << "', invalid header").str());
-        }
-        lseek(fd.get(), 0, SEEK_SET);
-        if (header.version != default_header.version || header.flags != default_header.flags
+    olean_header default_header = {};
+    olean_header header;
+    if (read(fd.get(), &header, sizeof(header)) != sizeof(header)
+        || memcmp(header.marker, default_header.marker, sizeof(header.marker)) != 0) {
+        throw exception((sstream() << "failed to read file '" << olean_fn << "', invalid header").str());
+    }
+    if (header.flags != default_header.flags
 #ifdef LEAN_CHECK_OLEAN_VERSION
-            || strncmp(header.githash, LEAN_GITHASH, sizeof(header.githash)) != 0
+        || strncmp(header.githash, LEAN_GITHASH, sizeof(header.githash)) != 0
 #endif
-        ) {
-            return io_result_mk_error((sstream() << "failed to read file '" << olean_fn << "', incompatible header").str());
-        }
-        char * base_addr = reinterpret_cast<char *>(header.base_addr);
+    ) {
+        throw exception((sstream() << "failed to read file '" << olean_fn << "', incompatible header").str());
+    }
+    if (header.version != default_header.version) {
+        throw exception((sstream() << "failed to read file '" << olean_fn << "', incompatible header").str());
+    }
 
-        char * buffer = nullptr;
-        std::function<void()> free_data;
-
-        // If any dep region couldn't be mmap'd at its base address, we need writable memory
-        // for in-place pointer fixups, so don't attempt mmap.
-        bool try_mmap = true;
-        for (compacted_region * dep : dep_regions) {
-            if (dep->begin() != dep->base_addr()) { try_mmap = false; break; }
+    // Read dep table (v3+) and recursively load dep regions
+    std::vector<compacted_region *> dep_regions;
+    std::vector<std::pair<size_t, ptrdiff_t>> lib_relocs;
+    size_t ext_file_size = 0;
+    uint32_t num_deps;
+    if (read(fd.get(), &num_deps, sizeof(num_deps)) != sizeof(num_deps)) {
+        throw exception((sstream() << "failed to read dep table from '" << olean_fn << "'").str());
+    }
+    ext_file_size += sizeof(num_deps);
+    for (uint32_t i = 0; i < num_deps; i++) {
+        uint32_t path_len;
+        if (read(fd.get(), &path_len, sizeof(path_len)) != sizeof(path_len)) {
+            throw exception((sstream() << "failed to read dep table from '" << olean_fn << "'").str());
         }
+        std::string dep_path(path_len, '\0');
+        if (read(fd.get(), &dep_path[0], path_len) != static_cast<ssize_t>(path_len)) {
+            throw exception((sstream() << "failed to read dep table from '" << olean_fn << "'").str());
+        }
+        ext_file_size += sizeof(path_len) + path_len;
+        dep_regions.push_back(read_module_data_incr_core(dep_path, out));
+    }
+
+    // Read lib relocation table
+    lib_relocs = read_lib_table_from_fd(fd.get(), ext_file_size);
+
+    // Skip padding to size_t alignment
+    if (ext_file_size % sizeof(size_t) != 0) {
+        size_t padding = sizeof(size_t) - (ext_file_size % sizeof(size_t));
+        lseek(fd.get(), padding, SEEK_CUR);
+        ext_file_size += padding;
+    }
+
+    lseek(fd.get(), 0, SEEK_SET);
+    char * base_addr = reinterpret_cast<char *>(header.base_addr);
+    size_t data_offset = sizeof(olean_header) + ext_file_size;
+
+    char * buffer = nullptr;
+    std::function<void()> free_data;
+
+    // If any dep region couldn't be mmap'd at its base address, or if closure relocation
+    // is needed, we need writable memory for in-place pointer fixups, so don't attempt mmap.
+    bool try_mmap = true;
+    for (compacted_region * dep : dep_regions) {
+        if (dep->begin() != dep->base_addr()) { try_mmap = false; break; }
+    }
+    // Check if any closure fn ptr relocation is actually needed
+    bool needs_fn_reloc = false;
+    for (auto const & [_, delta] : lib_relocs) {
+        if (delta != 0) { needs_fn_reloc = true; break; }
+    }
+    if (needs_fn_reloc) try_mmap = false;
 
 #ifdef LEAN_MMAP
-        if (try_mmap) {
+    if (try_mmap) {
 #ifdef LEAN_WINDOWS
-            HANDLE h_map = CreateFileMapping(h_file, NULL, PAGE_READONLY, 0, 0, NULL);
-            if (h_map != NULL) {
-                buffer = static_cast<char *>(MapViewOfFileEx(h_map, FILE_MAP_READ, 0, 0, 0, base_addr));
-                lean_always_assert(CloseHandle(h_map));
-                if (buffer && buffer == base_addr) {
-                    free_data = [=]() { lean_always_assert(UnmapViewOfFile(base_addr)); };
-                } else if (buffer) {
-                    lean_always_assert(UnmapViewOfFile(buffer));
-                    buffer = nullptr;
-                }
-            }
-#else
-            buffer = static_cast<char *>(mmap(base_addr, size, PROT_READ, MAP_PRIVATE, fd.get(), 0));
-            if (buffer != MAP_FAILED && buffer == base_addr) {
-                free_data = [=]() { lean_always_assert(munmap(buffer, size) == 0); };
-            } else {
-                if (buffer != MAP_FAILED) munmap(buffer, size);
+        HANDLE h_map = CreateFileMapping(h_file, NULL, PAGE_READONLY, 0, 0, NULL);
+        if (h_map != NULL) {
+            buffer = static_cast<char *>(MapViewOfFileEx(h_map, FILE_MAP_READ, 0, 0, 0, base_addr));
+            lean_always_assert(CloseHandle(h_map));
+            if (buffer && buffer == base_addr) {
+                free_data = [=]() { lean_always_assert(UnmapViewOfFile(base_addr)); };
+            } else if (buffer) {
+                lean_always_assert(UnmapViewOfFile(buffer));
                 buffer = nullptr;
             }
-#endif
+        }
+#else
+        buffer = static_cast<char *>(mmap(base_addr, size, PROT_READ, MAP_PRIVATE, fd.get(), 0));
+        if (buffer != MAP_FAILED && buffer == base_addr) {
+            free_data = [=]() { lean_always_assert(munmap(buffer, size) == 0); };
+        } else {
+            if (buffer != MAP_FAILED) munmap(buffer, size);
+            buffer = nullptr;
         }
 #endif
+    }
+#endif
 
-        if (!buffer) {
-            // Fallback: malloc and read
-            buffer = static_cast<char *>(malloc(size));
-            lseek(fd.get(), 0, SEEK_SET);
-            if (::read(fd.get(), buffer, size) != static_cast<ssize_t>(size)) {
-                free(buffer);
-                return io_result_mk_error((sstream() << "failed to read file '" << olean_fn << "'").str());
+    if (!buffer) {
+        buffer = static_cast<char *>(malloc(size));
+        lseek(fd.get(), 0, SEEK_SET);
+        if (::read(fd.get(), buffer, size) != static_cast<ssize_t>(size)) {
+            free(buffer);
+            throw exception((sstream() << "failed to read file '" << olean_fn << "'").str());
+        }
+        free_data = [=]() { free_sized(const_cast<char*>(buffer), size); };
+    }
+
+    // Include transitive dep regions (each dep's own deps)
+    {
+        std::vector<compacted_region *> all_deps;
+        for (compacted_region * dep : dep_regions) {
+            for (compacted_region * transitive : dep->dep_regions()) {
+                all_deps.push_back(transitive);
             }
-            free_data = [=]() { free_sized(const_cast<char*>(buffer), size); };
+            all_deps.push_back(dep);
         }
+        dep_regions = std::move(all_deps);
+    }
 
-        bool is_mmap = (buffer == base_addr);
-        compacted_region * region = new compacted_region(
-            size - sizeof(olean_header), buffer + sizeof(olean_header),
-            base_addr + sizeof(olean_header), is_mmap, free_data, dep_regions);
+    bool is_mmap = (buffer == base_addr);
+    compacted_region * region = new compacted_region(
+        size - data_offset, buffer + data_offset,
+        base_addr + data_offset, is_mmap, free_data,
+        olean_fn, std::move(dep_regions), std::move(lib_relocs));
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
-        __lsan_ignore_object(region);
+    __lsan_ignore_object(region);
 #endif
 #endif
-        object * mod_data = region->read();
-        object * result = alloc_cnstr(0, 2, 0);
-        cnstr_set(result, 0, mod_data);
-        cnstr_set(result, 1, box_size_t(reinterpret_cast<size_t>(region)));
-        return io_result_mk_ok(result);
+    object * mod_data = region->read();
+    out.push_back(std::make_pair(region, mod_data));
+    return region;
+}
+
+extern "C" LEAN_EXPORT object * lean_read_module_data_incr(b_obj_arg ofname, object *) {
+    try {
+        std::vector<std::pair<compacted_region *, object *>> parts;
+        read_module_data_incr_core(std::string(lean_string_cstr(ofname)), parts);
+        std::vector<object_ref> res;
+        for (std::pair<compacted_region *, object *> & p : parts) {
+            object * pair = alloc_cnstr(0, 2, 0);
+            cnstr_set(pair, 0, p.second);
+            cnstr_set(pair, 1, box_size_t(reinterpret_cast<size_t>(p.first)));
+            res.push_back(object_ref(pair));
+        }
+        return io_result_mk_ok(to_array(res));
     } catch (exception & ex) {
-        return io_result_mk_error((sstream() << "failed to read '" << olean_fn << "': " << ex.what()).str());
+        return io_result_mk_error((sstream() << "failed to read '" << lean_string_cstr(ofname) << "': " << ex.what()).str());
     }
 }
 }

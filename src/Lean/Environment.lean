@@ -1750,11 +1750,10 @@ def Compactor := CompactorSpec.type
 opaque saveModuleDataIncr (fname : @& System.FilePath) (mod : @& Name) (data : @& ModuleData)
     (depRegions : @& Array CompactedRegion) (prev : Option Compactor) : IO Compactor
 
-/-- Read a single module from disk with incremental sharing.
-    `depRegions` are existing compacted regions whose address ranges are needed for pointer fixup. -/
+/-- Read a module and all its dep regions from disk. Returns an array of all parts,
+    deps-first (the last element is the requested file's data). -/
 @[extern "lean_read_module_data_incr"]
-opaque readModuleDataIncr (fname : @& System.FilePath)
-    (depRegions : @& Array CompactedRegion) : IO (ModuleData × CompactedRegion)
+opaque readModuleDataIncr (fname : @& System.FilePath) : IO (Array (ModuleData × CompactedRegion))
 
 /--
 Stores each given module data in the respective file name. Objects shared with prior parts are not
@@ -1773,19 +1772,17 @@ Loads the module data from the given file names. The files must be (a prefix of)
 `saveModuleDataParts` call.
 -/
 def readModuleDataParts (fnames : Array System.FilePath) : IO (Array (ModuleData × CompactedRegion)) := do
-  let mut depRegions : Array CompactedRegion := #[]
-  let mut result : Array (ModuleData × CompactedRegion) := #[]
-  for fname in fnames do
-    let part ← readModuleDataIncr fname depRegions
-    result := result.push part
-    depRegions := depRegions.push part.2
-  return result
+  match fnames.back? with
+  | some fname => readModuleDataIncr fname
+  | none => return #[]
 
 def saveModuleData (fname : System.FilePath) (mod : Name) (data : ModuleData) : IO Unit := do
   let _ ← saveModuleDataIncr fname mod data #[] none
 
-def readModuleData (fname : System.FilePath) : IO (ModuleData × CompactedRegion) :=
-  readModuleDataIncr fname #[]
+def readModuleData (fname : System.FilePath) : IO (ModuleData × CompactedRegion) := do
+  let parts ← readModuleDataIncr fname
+  let some part := parts.back? | throw <| IO.userError s!"failed to read module data from '{fname}'"
+  return part
 
 /--
   Free compacted regions of imports. No live references to imported objects may exist at the time of invocation; in
