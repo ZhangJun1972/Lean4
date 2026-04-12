@@ -240,4 +240,4 @@ public partial def wrapInstance (inst expectedType : Expr) (compile : Bool := tr
             enableRealizationsForConst name
         else
           mvarId.assign arg
-      return mkAppN f (← mvars.mapM instantiateMVars)
+      instantiateMVars (mkAppN f mvars)
