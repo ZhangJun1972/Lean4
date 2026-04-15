@@ -13,6 +13,7 @@ public import Lean.Elab.Tactic.Grind.Main
 public import Lean.Elab.Parallel
 public meta import Lean.Elab.Command
 import Init.Omega
+import Lean.Elab.ConfigEval
 public section
 namespace Lean.Elab.Tactic
 open Meta
