@@ -54,6 +54,7 @@ test_manifest v7
 test_manifest v1.0.0
 test_manifest v1.1.0
 test_manifest v1.2.0
+test_manifest v1.3.0
 
 # cleanup
 rm -rf bar/.git
