@@ -382,6 +382,32 @@ def toDecodedSegments (p : Path) : Array String :=
   p.segments.map fun seg =>
     seg.decode.getD (toString seg)
 
+/--
+Returns `true` if `pre` is a segment-wise prefix of `p`. Each segment in `pre` must equal
+the corresponding segment in `p` by encoded value. An absolute `pre` additionally requires
+`p` to be absolute.
+-/
+def startsWith (p pre : Path) : Bool :=
+  (!pre.absolute || p.absolute) &&
+  pre.segments.size ≤ p.segments.size &&
+  (Array.range pre.segments.size).all fun i => p.segments[i]! == pre.segments[i]!
+
+/--
+Returns `true` if the path ends with a trailing slash. The root path (`/`) is considered to
+have a trailing slash.
+-/
+def hasTrailingSlash (p : Path) : Bool :=
+  (p.absolute && p.segments.isEmpty) ||
+  (p.segments.back?.map (toString · == "") |>.getD false)
+
+/--
+Ensures the path ends with a trailing slash by appending an empty segment if needed. Idempotent:
+the root path (`/`) and any path already ending with `/` are returned unchanged.
+-/
+def ensureTrailingSlash (p : Path) : Path :=
+  if p.hasTrailingSlash then p
+  else { p with segments := p.segments.push (EncodedSegment.encode "") }
+
 end Path
 
 /--

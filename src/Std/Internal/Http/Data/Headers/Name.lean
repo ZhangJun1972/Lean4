@@ -179,4 +179,24 @@ Standard Expect header name
 -/
 def expect : Header.Name := .mk "expect"
 
+/--
+Standard Cookie header name (client → server)
+-/
+def cookie : Header.Name := .mk "cookie"
+
+/--
+Standard Set-Cookie header name (server → client)
+-/
+def setCookie : Header.Name := .mk "set-cookie"
+
+/--
+Standard Location header name
+-/
+def location : Header.Name := .mk "location"
+
+/--
+Standard Proxy-Authorization header name
+-/
+def proxyAuthorization : Header.Name := .mk "proxy-authorization"
+
 end Std.Http.Header.Name

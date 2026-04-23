@@ -101,6 +101,13 @@ private structure State where
   These partial pieces are collapsed and emitted as a single chunk on the next complete send.
   -/
   pendingIncompleteChunk : Option Chunk := none
+
+  /--
+  Terminal error recorded when the producer could not deliver the full body
+  (e.g. connection closed mid-stream with a Content-Length underflow). Surfaced
+  to the consumer on the next `recv` after any already-buffered chunks.
+  -/
+  closeError : Option IO.Error := none
 deriving Nonempty
 
 end Channel
@@ -123,6 +130,7 @@ def mkStream : Async Stream := do
     interestWaiter := none
     closed := false
     knownSize := none
+    closeError := none
   }
   return { state }
 
@@ -249,7 +257,11 @@ private def recv' (stream : Stream) : BaseIO (AsyncTask (Option Chunk)) := do
 
     let st ← get
     if st.closed then
-      return AsyncTask.pure none
+      -- A terminal error recorded by the producer (e.g. Content-Length underflow)
+      -- must surface to the consumer instead of silent EOF.
+      match st.closeError with
+      | some err => return Task.pure (.error err)
+      | none => return AsyncTask.pure none
 
     if st.pendingConsumer.isSome then
       return Task.pure (.error (IO.Error.userError "only one blocked consumer is allowed"))
@@ -264,15 +276,39 @@ private def recv' (stream : Stream) : BaseIO (AsyncTask (Option Chunk)) := do
 /--
 Receives a chunk from the channel. Blocks until a producer sends one.
 Returns `none` if the channel is closed and no producer is waiting.
+If the channel was closed with a terminal error (via `closeWithError`) after
+all buffered chunks have been consumed, that error is thrown instead of EOF.
 -/
 def recv (stream : Stream) : Async (Option Chunk) := do
-  Async.ofAsyncTask (← recv' stream)
+  let result ← Async.ofAsyncTask (← recv' stream)
+  match result with
+  | some _ => return result
+  | none =>
+    let err? ← stream.state.atomically do
+      let st ← get
+      pure st.closeError
+    match err? with
+    | some err => throw err
+    | none => return none
 
 /--
 Closes the channel.
 -/
 def close (stream : Stream) : Async Unit :=
   stream.state.atomically do
+    Channel.close'
+
+/--
+Closes the channel and records `err` as a terminal error. A subsequent `recv`
+that would have returned end-of-stream surfaces the error instead; already
+buffered chunks are still delivered first.
+-/
+def closeWithError (stream : Stream) (err : IO.Error) : Async Unit :=
+  stream.state.atomically do
+    let st ← get
+    -- Do not overwrite an existing error; record the first one.
+    if st.closeError.isNone then
+      set { st with closeError := some err }
     Channel.close'
 
 /--
@@ -384,15 +420,29 @@ class NextChunk (m : Type → Type) where
   -/
   nextChunk : Stream → m (Option Chunk)
 
+/-- Check for a terminal error after an EOF observation. -/
+def checkCloseError (stream : Stream) : Async Unit := do
+  let err? ← stream.state.atomically do
+    let st ← get
+    pure st.closeError
+  match err? with
+  | some err => throw err
+  | none => pure ()
+
 instance : NextChunk Async where
   nextChunk := Stream.recv
 
 instance : NextChunk ContextAsync where
   nextChunk stream := do
-    Selectable.one #[
+    let result ← Selectable.one #[
       .case stream.recvSelector pure,
       .case (← ContextAsync.doneSelector) (fun _ => pure none),
     ]
+    match result with
+    | some _ => return result
+    | none =>
+      checkCloseError stream
+      return none
 
 /--
 Reads all remaining chunks and decodes them into `α`.
@@ -644,6 +694,8 @@ def stream
     (gen : Body.Stream → Async Unit) :
     Async (Request Body.Stream) := do
   let s ← Body.stream gen
+  s.setKnownSize (some .chunked)
+
   return Request.Builder.body builder s
 
 end Request.Builder

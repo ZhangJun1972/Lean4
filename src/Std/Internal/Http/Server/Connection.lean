@@ -287,8 +287,11 @@ private def processH1Events
     | .failed err =>
       Handler.onFailure handler (toString err)
 
+      -- Surface the error through the request body so a handler's `readAll`
+      -- sees it instead of silently returning the truncated bytes it already
+      -- consumed (e.g. client closed mid-upload with a CL underflow).
       if ¬(← Body.isClosed st.requestStream) then
-        Body.close st.requestStream
+        st.requestStream.closeWithError (.userError (toString err))
 
       st := { st with requiresData := false, pendingHead := none }
       break

@@ -8,10 +8,12 @@ module
 prelude
 public import Std.Internal.Http.Data.Body.Basic
 public import Std.Internal.Http.Data.Body.Length
+public import Std.Internal.Http.Data.Body.Replayable
 public import Std.Internal.Http.Data.Body.Any
 public import Std.Internal.Http.Data.Body.Stream
 public import Std.Internal.Http.Data.Body.Empty
 public import Std.Internal.Http.Data.Body.Full
+public import Std.Internal.Http.Data.Body.Buffered
 
 public section
 
