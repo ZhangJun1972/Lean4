@@ -11,7 +11,7 @@ import Lean.Compiler.LCNF.Passes
 import Lean.Compiler.LCNF.ToDecl
 import Lean.Compiler.LCNF.Check
 import Lean.Meta.Match.MatcherInfo
-import Lean.Compiler.LCNF.SplitSCC
+import Lean.Compiler.LCNF.SCCUtils
 public import Lean.Compiler.IR.Basic
 public import Lean.Compiler.LCNF.CompilerM
 
