@@ -12,6 +12,7 @@ public import Lean.Parser.Module
 public import Lean.ParserCompiler
 public import Lean.Util.NumObjs
 public import Lean.Util.ShareCommon
+public import Lean.PrettyPrinter.Memoize
 
 public section
 
@@ -48,6 +49,9 @@ def ppExpr (e : Expr) : MetaM Format := do
 to `Elab.Info` nodes produced by the delaborator at various subexpressions of `e`. -/
 def ppExprWithInfos (e : Expr) (optsPerPos : Delaborator.OptionsPerPos := {}) (delab := Delaborator.delab)
     : MetaM FormatWithInfos := do
+  if getPPMemoize (← getOptions) then
+    let s ← ppMemoized e
+    return ⟨.text s, ∅⟩
   let lctx := (← getLCtx).sanitizeNames.run' { options := (← getOptions) }
   Meta.withLCtx' lctx do
     let (stx, infos) ← delabCore e optsPerPos delab

@@ -196,6 +196,11 @@ register_builtin_option pp.instanceTypes : Bool := {
   defValue := false
   descr    := "(pretty printer) when printing explicit applications, show the types of inst-implicit arguments"
 }
+register_builtin_option pp.memoize : Bool := {
+  defValue := false
+  descr    := "(pretty printer) display expressions with shared subexpression memoization, " ++
+              "using `memoized%` and `memo` syntax for compact representation"
+}
 register_builtin_option pp.deepTerms : Bool := {
   defValue := false
   descr    := "(pretty printer) display deeply nested terms, replacing them with `⋯` if set to false"
@@ -289,5 +294,6 @@ def getPPInstances (o : Options) : Bool := o.get pp.instances.name pp.instances.
 def getPPInstanceTypes (o : Options) : Bool := o.get pp.instanceTypes.name pp.instanceTypes.defValue
 def getPPDeepTerms (o : Options) : Bool := o.get pp.deepTerms.name (pp.deepTerms.defValue || getPPAll o)
 def getPPDeepTermsThreshold (o : Options) : Nat := o.get pp.deepTerms.threshold.name pp.deepTerms.threshold.defValue
+def getPPMemoize (o : Options) : Bool := o.get pp.memoize.name pp.memoize.defValue
 
 end Lean

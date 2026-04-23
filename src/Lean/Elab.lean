@@ -38,6 +38,7 @@ public import Lean.Elab.DeclarationRange
 public import Lean.Elab.Extra
 public import Lean.Elab.GenInjective
 public import Lean.Elab.BuiltinTerm
+public import Lean.Elab.MemoizedTerm
 public import Lean.Elab.Arg
 public import Lean.Elab.DeprecatedArg
 public import Lean.Elab.PatternVar
