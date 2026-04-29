@@ -108,3 +108,43 @@ info: zoned("2012-12-10T00:35:47.000000000-02:00")
 -/
 #guard_msgs in
 #eval ZonedDateTime.ofTimestamp (Timestamp.ofSecondsSinceUnixEpoch 1355106947) rules
+
+-- ZoneRules.findTransitionForTimestamp: a timestamp before the first transition uses initialLocalTimeType.
+def testZoneRulesInitialLTT : TimeZone.ZoneRules :=
+  let initLTT : TimeZone.LocalTimeType := {
+    gmtOffset := .ofSeconds 3600,
+    isDst := false, abbreviation := "TST1",
+    wall := .standard, utLocal := .ut, identifier := "Test/Zone1"
+  }
+  let transLTT : TimeZone.LocalTimeType := {
+    gmtOffset := .ofSeconds 7200,
+    isDst := false, abbreviation := "TST2",
+    wall := .standard, utLocal := .ut, identifier := "Test/Zone2"
+  }
+  { initialLocalTimeType := initLTT, transitions := #[⟨100, transLTT⟩] }
+
+/--
+info: "Test/Zone1"
+-/
+#guard_msgs in
+#eval
+  let tm := Timestamp.ofSecondsSinceUnixEpoch 50
+  (ZonedDateTime.ofTimestamp tm testZoneRulesInitialLTT).timezone.name
+
+-- Transition.apply adds the GMT offset exactly once to the timestamp.
+def testTransitionApply : TimeZone.Transition :=
+  { time := 0
+    localTimeType := {
+      gmtOffset := .ofSeconds 3600,
+      isDst := false, abbreviation := "TST",
+      wall := .standard, utLocal := .ut, identifier := "Test/Zone"
+    }
+  }
+
+/--
+info: 4600
+-/
+#guard_msgs in
+#eval
+  let t := Timestamp.ofSecondsSinceUnixEpoch 1000
+  (TimeZone.Transition.apply t testTransitionApply).toSecondsSinceUnixEpoch.val

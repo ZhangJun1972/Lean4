@@ -64,31 +64,8 @@ Creates a new `ZonedDateTime` out of a `PlainDateTime` and a `ZoneRules`.
 @[inline]
 def ofPlainDateTime (pdt : PlainDateTime) (zr : TimeZone.ZoneRules) : ZonedDateTime :=
   let tm := pdt.toTimestampAssumingUTC
-
-  let transition :=
-    let value := tm.toSecondsSinceUnixEpoch
-    if let some idx := zr.transitions.findFinIdx? (fun t => t.time.val ≥ value.val)
-      then
-        if idx.1 > 0 then
-          let last := zr.transitions[idx.1 - 1]
-          let next := zr.transitions[idx]
-
-          let utcNext := next.time.add last.localTimeType.gmtOffset.second
-
-          if utcNext.val > tm.toSecondsSinceUnixEpoch.val
-            then some last
-            else some next
-        else
-          none
-
-      else zr.transitions.back?
-
-  let tz :=
-    transition
-    |>.map (·.localTimeType)
-    |>.getD zr.initialLocalTimeType
-    |>.getTimeZone
-
+  let ltt := zr.findLocalTimeTypeForWallTime tm.toSecondsSinceUnixEpoch.val
+  let tz := ltt.getTimeZone
   let tm := tm.subSeconds tz.toSeconds
   ZonedDateTime.mk (Thunk.mk fun _ => tm.toPlainDateTimeAssumingUTC.addSeconds tz.toSeconds) tm zr tz
 

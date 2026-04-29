@@ -208,6 +208,21 @@ def findLocalTimeTypeForTimestamp (zr : ZoneRules) (timestamp : Timestamp) : Loc
   |>.getD zr.initialLocalTimeType
 
 /--
+Finds the `LocalTimeType` for a given wall-clock time (seconds since Unix epoch in local time).
+Unlike `findLocalTimeTypeForTimestamp`, this compares each transition's UTC time adjusted by the
+previous offset — necessary when converting local time to UTC.
+-/
+def findLocalTimeTypeForWallTime (zr : ZoneRules) (wallSecs : Int) : LocalTimeType :=
+  let (ltt, _) := zr.transitions.foldl (init := (zr.initialLocalTimeType, false))
+    fun (ltt, done) t =>
+      if done then (ltt, true)
+      else
+        let localTransitionTime := t.time.add ltt.gmtOffset.second
+        if wallSecs < localTransitionTime.val then (ltt, true)
+        else (t.localTimeType, false)
+  ltt
+
+/--
 Find the current `TimeZone` out of a `Transition` in a `ZoneRules`
 -/
 @[inline]

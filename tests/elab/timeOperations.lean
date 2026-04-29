@@ -317,3 +317,22 @@ info: 4
 -/
 #guard_msgs in
 #eval date("2024-01-22").alignedWeekOfMonth
+
+-- DateTime.millisecond delegates to PlainTime.millisecond (ediv 1000000), not emod 1000.
+/--
+info: 123
+-/
+#guard_msgs in
+#eval
+  let t := PlainTime.ofHourMinuteSecondsNano 10 30 ⟨0, by decide⟩ ⟨123456789, by decide⟩
+  let dt : DateTime .UTC := DateTime.ofPlainDateTime ⟨PlainDate.ofYearMonthDayClip 2024 .august 15, t⟩ .UTC
+  dt.millisecond.val
+
+-- PlainTime.addMilliseconds preserves sub-millisecond nanoseconds (uses nanosecond arithmetic).
+/--
+info: 501500000
+-/
+#guard_msgs in
+#eval
+  let t := PlainTime.ofHourMinuteSecondsNano 0 0 ⟨0, by decide⟩ ⟨500500000, by decide⟩
+  (t.addMilliseconds 1).nanosecond.val

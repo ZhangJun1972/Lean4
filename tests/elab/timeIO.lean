@@ -81,3 +81,52 @@ info: 2003-10-26T01:59:59.000000000-05:00
   println! "{ZonedDateTime.ofPlainDateTime datetime("2003-10-26T01:59:59") zr |>.toLeanDateTimeWithZoneString}"
   println! "{ZonedDateTime.ofPlainDateTime datetime("2003-10-26T02:00:00") zr |>.toLeanDateTimeWithZoneString}"
   println! "{ZonedDateTime.ofPlainDateTime datetime("2003-10-26T02:59:59") zr |>.toLeanDateTimeWithZoneString}"
+
+-- ZoneRules.findTransitionForTimestamp: a timestamp one second before the first transition
+-- uses initialLocalTimeType (LMT), not the first post-transition type.
+/--
+info: true
+-/
+#guard_msgs in
+#eval show IO Bool from do
+  let rules ← Database.defaultGetZoneRules "America/New_York"
+  if h : 0 < rules.transitions.size then
+    let first := rules.transitions[0]
+    let beforeFirst := Timestamp.ofSecondsSinceUnixEpoch ⟨first.time.val - 1⟩
+    let zdt := ZonedDateTime.ofTimestamp beforeFirst rules
+    return zdt.timezone.name == rules.initialLocalTimeType.identifier
+  else
+    return true
+
+-- ZonedDateTime.ofPlainDateTime resolves local wall-clock time using the correct offset sign.
+-- UTC+2 → UTC+3 spring-forward at UTC t=3600: gap is local 03:00–04:00.
+def bugZonePlus : TimeZone.ZoneRules :=
+  let before : TimeZone.LocalTimeType := {
+    gmtOffset := .ofSeconds 7200,
+    isDst := false, abbreviation := "TST2",
+    wall := .standard, utLocal := .ut, identifier := "Test/Plus2"
+  }
+  let after : TimeZone.LocalTimeType := {
+    gmtOffset := .ofSeconds 10800,
+    isDst := true, abbreviation := "TST3",
+    wall := .standard, utLocal := .ut, identifier := "Test/Plus3"
+  }
+  { initialLocalTimeType := before, transitions := #[⟨3600, after⟩] }
+
+/--
+info: "Test/Plus2"
+-/
+#guard_msgs in
+#eval
+  let pdt : PlainDateTime :=
+    ⟨PlainDate.ofYearMonthDayClip 1970 1 1, PlainTime.ofHourMinuteSecondsNano 2 30 0 0⟩
+  (ZonedDateTime.ofPlainDateTime pdt bugZonePlus).timezone.name
+
+/--
+info: "Test/Plus3"
+-/
+#guard_msgs in
+#eval
+  let pdt : PlainDateTime :=
+    ⟨PlainDate.ofYearMonthDayClip 1970 1 1, PlainTime.ofHourMinuteSecondsNano 4 30 0 0⟩
+  (ZonedDateTime.ofPlainDateTime pdt bugZonePlus).timezone.name
