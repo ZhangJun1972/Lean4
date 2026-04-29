@@ -339,13 +339,13 @@ info: "3 03 3rd quarter 3"
 #eval zoned₄.format "Q QQ QQQQ QQQQQ"
 
 /--
-info: "28 28 028 0028"
+info: "29 29 029 0029"
 -/
 #guard_msgs in
 #eval zoned₄.format "w ww www wwww"
 
 /--
-info: "2 02 002 0002"
+info: "3 03 003 0003"
 -/
 #guard_msgs in
 #eval zoned₄.format "W WW WWW WWWW"

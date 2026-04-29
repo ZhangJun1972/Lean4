@@ -585,11 +585,11 @@ structure FormatConfig where
   allowLeapSeconds : Bool := false
 
   /--
-  Locale-specific symbols used for formatting and parsing text fields such as month names,
-  weekday names, era designators, and AM/PM markers.
-  Default is `LocaleSymbols.enUS` (English, US).
+  Locale configuration for formatting and parsing, including locale-specific symbols and the first
+  day of the week used for week-of-year and week-of-month calculations.
+  Default is `Locale.enUS` (English, US).
   -/
-  locale : LocaleSymbols := LocaleSymbols.enUS
+  locale : Locale := Locale.enUS
 
 deriving Inhabited
 
@@ -871,7 +871,7 @@ private def formatWith (locale : LocaleSymbols) (modifier : Modifier) (data : Ty
         then "Z"
         else  toIsoString data true (data.second.val % 60 ≠ 0) true
 
-private def dateFromModifier (date : DateTime tz) : TypeFormat modifier :=
+private def dateFromModifier (firstDay : Weekday) (date : DateTime tz) : TypeFormat modifier :=
   match modifier with
   | .G _ => date.era
   | .y _ => date.year
@@ -880,8 +880,8 @@ private def dateFromModifier (date : DateTime tz) : TypeFormat modifier :=
   | .MorL _ => date.month
   | .d _ => date.day
   | .Qorq _ => date.quarter
-  | .w _ => date.weekOfYear
-  | .W _ => date.alignedWeekOfMonth
+  | .w _ => date.weekOfYear firstDay
+  | .W _ => date.alignedWeekOfMonth firstDay
   | .E _ =>  date.weekday
   | .eorc _ => date.weekday
   | .F _ => date.weekOfMonth
@@ -1074,9 +1074,9 @@ private def parseOffset (withMinutes : Reason) (withSeconds : Reason) (withColon
 private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (TypeFormat mod)
   | .G format =>
     match format with
-    | .short => parseEraShort config.locale
-    | .full => parseEraLong config.locale
-    | .narrow => parseEraNarrow config.locale
+    | .short => parseEraShort config.locale.symbols
+    | .full => parseEraLong config.locale.symbols
+    | .narrow => parseEraNarrow config.locale.symbols
   | .y format =>
     match format with
     | .any => Int.ofNat <$> parseAtLeastNum 1
@@ -1093,35 +1093,35 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
   | .MorL format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
-    | .inr .short => parseMonthShort config.locale
-    | .inr .full => parseMonthLong config.locale
-    | .inr .narrow => parseMonthNarrow config.locale
+    | .inr .short => parseMonthShort config.locale.symbols
+    | .inr .full => parseMonthLong config.locale.symbols
+    | .inr .narrow => parseMonthNarrow config.locale.symbols
   | .d format => parseNatToBounded (parseFlexibleNum format.padding)
   | .Qorq format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
-    | .inr .short => parseQuarterShort config.locale
-    | .inr .full => parseQuarterLong config.locale
+    | .inr .short => parseQuarterShort config.locale.symbols
+    | .inr .full => parseQuarterLong config.locale.symbols
     | .inr .narrow => parseQuarterNumber
   | .w format => parseNatToBounded (parseFlexibleNum format.padding)
   | .W format => parseNatToBounded (parseFlexibleNum format.padding)
   | .E format =>
     match format with
-    | .short => parseWeekdayShort config.locale
-    | .full => parseWeekdayLong config.locale
-    | .narrow => parseWeekdayNarrow config.locale
+    | .short => parseWeekdayShort config.locale.symbols
+    | .full => parseWeekdayLong config.locale.symbols
+    | .narrow => parseWeekdayNarrow config.locale.symbols
   | .eorc format =>
     match format with
     | .inl format => Weekday.ofOrdinal <$> parseNatToBounded (parseFlexibleNum format.padding)
-    | .inr .short => parseWeekdayShort config.locale
-    | .inr .full => parseWeekdayLong config.locale
-    | .inr .narrow => parseWeekdayNarrow config.locale
+    | .inr .short => parseWeekdayShort config.locale.symbols
+    | .inr .full => parseWeekdayLong config.locale.symbols
+    | .inr .narrow => parseWeekdayNarrow config.locale.symbols
   | .F format => parseNatToBounded (parseFlexibleNum format.padding)
   | .a format =>
     match format with
-    | .short => parseMarkerShort config.locale
-    | .full => parseMarkerLong config.locale
-    | .narrow => parseMarkerNarrow config.locale
+    | .short => parseMarkerShort config.locale.symbols
+    | .full => parseMarkerLong config.locale.symbols
+    | .narrow => parseMarkerNarrow config.locale.symbols
   | .h format => parseNatToBounded (parseFlexibleNum format.padding)
   | .K format => parseNatToBounded (parseFlexibleNum format.padding)
   | .k format => parseNatToBounded (parseFlexibleNum format.padding)
@@ -1182,9 +1182,9 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
       (skipString "Z" *> pure Offset.zero)
       <|> (parseOffset .yes .optional true)
 
-private def formatPartWithDate (locale : LocaleSymbols) (date : DateTime tz) (part : FormatPart) : String :=
+private def formatPartWithDate (locale : Locale) (date : DateTime tz) (part : FormatPart) : String :=
   match part with
-  | .modifier mod => formatWith locale mod (dateFromModifier date)
+  | .modifier mod => formatWith locale.symbols mod (dateFromModifier locale.firstDayOfWeek date)
   | .string s => s
 
 set_option linter.missingDocs false in  -- TODO
@@ -1416,7 +1416,7 @@ def parseBuilder! [Inhabited α] (format : GenericFormat aw)  (builder : FormatT
 Formats the date using the format into a String, using a `getInfo` function to get the information needed to build the `String`.
 -/
 def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Option (TypeFormat typ)) : Option String :=
-  let locale := format.config.locale
+  let locale := format.config.locale.symbols
   let rec go (data : String) : (format : FormatString) → Option String
     | .modifier x :: xs => do go (data ++ formatWith locale x (← getInfo x)) xs
     | .string x :: xs => go (data ++ x) xs
@@ -1427,7 +1427,7 @@ def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Op
 Constructs a `FormatType` function to format a date into a string using a `GenericFormat`.
 -/
 def formatBuilder (format : GenericFormat aw) : FormatType String format.string :=
-  let locale := format.config.locale
+  let locale := format.config.locale.symbols
   let rec go (data : String) : (format : FormatString) → FormatType String format
     | .modifier x :: xs => fun res => go (data ++ formatWith locale x res) xs
     | .string x :: xs => go (data ++ x) xs
