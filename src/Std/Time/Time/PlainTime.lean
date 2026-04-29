@@ -233,8 +233,7 @@ def subNanoseconds (time : PlainTime) (nanosToSub : Nanosecond.Offset) : PlainTi
 Adds milliseconds to a `PlainTime`.
 -/
 def addMilliseconds (time : PlainTime) (millisToAdd : Millisecond.Offset) : PlainTime :=
-  let total := time.toMilliseconds + millisToAdd
-  ofMilliseconds total
+  ofNanoseconds (time.toNanoseconds + millisToAdd.toNanoseconds)
 
 /--
 Subtracts milliseconds from a `PlainTime`.
@@ -261,7 +260,7 @@ Creates a new `PlainTime` by adjusting the milliseconds component inside the `na
 -/
 @[inline]
 def withMilliseconds (pt : PlainTime) (millis : Millisecond.Ordinal) : PlainTime :=
-  let minorPart := pt.nanosecond.emod 1000 (by decide)
+  let minorPart := pt.nanosecond.emod 1000000 (by decide)
   let majorPart := millis.mul_pos 1000000 (by decide) |>.addBounds minorPart
   { pt with nanosecond := majorPart |>.expandTop (by decide) }
 

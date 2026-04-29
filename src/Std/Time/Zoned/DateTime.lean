@@ -391,7 +391,7 @@ Getter for the `Milliseconds` inside of a `DateTime`
 -/
 @[inline]
 def millisecond (dt : DateTime tz) : Millisecond.Ordinal :=
-  dt.date.get.time.nanosecond.emod 1000 (by decide)
+  dt.date.get.time.millisecond
 
 /--
 Getter for the `Nanosecond` inside of a `DateTime`
