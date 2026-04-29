@@ -73,7 +73,7 @@ def ofPlainDateTime (pdt : PlainDateTime) (zr : TimeZone.ZoneRules) : ZonedDateT
           let last := zr.transitions[idx.1 - 1]
           let next := zr.transitions[idx]
 
-          let utcNext := next.time.sub last.localTimeType.gmtOffset.second.abs
+          let utcNext := next.time.add last.localTimeType.gmtOffset.second
 
           if utcNext.val > tm.toSecondsSinceUnixEpoch.val
             then some last
