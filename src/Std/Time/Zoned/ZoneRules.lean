@@ -159,7 +159,7 @@ If the timestamp falls between two transitions, it returns the most recent trans
 -/
 def findTransitionForTimestamp (transitions : Array Transition) (timestamp : Timestamp) : Option Transition :=
   if let some idx := findTransitionIndexForTimestamp transitions timestamp
-    then transitions[idx - 1]?
+    then if idx == 0 then none else transitions[idx - 1]?
     else transitions.back?
 
 /--
