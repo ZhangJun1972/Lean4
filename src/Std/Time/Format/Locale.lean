@@ -39,17 +39,17 @@ structure LocaleSymbols where
   monthNarrow : Vector String 12
 
   /--
-  Full weekday names (7 elements, index 0 = Sunday).
+  Full weekday names (7 elements, index 0 = Monday).
   -/
   weekdayLong : Vector String 7
 
   /--
-  Abbreviated weekday names (7 elements, index 0 = Sun).
+  Abbreviated weekday names (7 elements, index 0 = Mon).
   -/
   weekdayShort : Vector String 7
 
   /--
-  Narrow weekday names (7 elements, index 0 = S).
+  Narrow weekday names (7 elements, index 0 = M).
   -/
   weekdayNarrow : Vector String 7
 

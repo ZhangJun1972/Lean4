@@ -357,6 +357,24 @@ def weekOfYear (date : PlainDate) (firstDay : Weekday := .monday) : Week.Ordinal
     let w := w.truncateBottom h |>.truncateTop (Int.le_trans h₁ y.weeks.property.right)
     w
 
+/--
+Returns the week-based year for the given `PlainDate`, using `firstDay` as the start of the week.
+The week-based year may differ from the calendar year for dates near the start or end of the year.
+-/
+def weekYear (date : PlainDate) (firstDay : Weekday := .monday) : Year.Offset :=
+  let y := date.year
+  let posInWeek : Bounded.LE 1 7 :=
+    .ofNatWrapping ((date.weekday.toOrdinal.val - firstDay.toOrdinal.val + 7) % 7 + 1) (by decide)
+
+  let w := Bounded.LE.exact 10
+    |>.addBounds date.dayOfYear
+    |>.subBounds posInWeek
+    |>.ediv 7 (by decide)
+
+  if w.val < 1 then y - 1
+  else if w.val > y.weeks.val then y + 1
+  else y
+
 instance : HAdd PlainDate Day.Offset PlainDate where
   hAdd := addDays
 

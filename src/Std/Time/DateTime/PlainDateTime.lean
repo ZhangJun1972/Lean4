@@ -496,6 +496,14 @@ def weekOfYear (date : PlainDateTime) (firstDay : Weekday := .monday) : Week.Ord
   date.date.weekOfYear firstDay
 
 /--
+Returns the week-based year for the given `PlainDateTime`, using `firstDay` as the start of the week.
+The week-based year may differ from the calendar year for dates near the start or end of the year.
+-/
+@[inline]
+def weekYear (date : PlainDateTime) (firstDay : Weekday := .monday) : Year.Offset :=
+  date.date.weekYear firstDay
+
+/--
 Returns the unaligned week of the month for a `PlainDateTime` (day divided by 7, plus 1).
 -/
 def weekOfMonth (date : PlainDateTime) : Bounded.LE 1 5 :=
