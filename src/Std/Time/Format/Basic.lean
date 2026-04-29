@@ -1361,8 +1361,8 @@ private def build (builder : DateBuilder) (aw : Awareness) : Option aw.type :=
     isDST := false,
   }
 
-  let month := builder.MorL |>.getD 0
-  let day := builder.d |>.getD 0
+  let month := builder.MorL |>.getD 1
+  let day := builder.d |>.getD 1
   let era := (builder.G.getD .ce)
 
   let year
@@ -1381,7 +1381,8 @@ private def build (builder : DateBuilder) (aw : Awareness) : Option aw.type :=
     hour <|> (
       let one : Option (Bounded.LE 0 23) := builder.H
       let other : Option (Bounded.LE 0 23) := (Bounded.LE.sub · 1) <$> builder.k
-      (one <|> other))
+      let hNoMarker : Option (Bounded.LE 0 23) := HourMarker.am.toAbsolute <$> builder.h
+      (one <|> other <|> hNoMarker))
       |>.getD ⟨0, by decide⟩
 
   let minute := builder.m |>.getD 0
