@@ -810,7 +810,7 @@ private:
         m_call_stack.emplace_back(decl_fun_id(d), arg_bp, m_jp_stack.size());
     }
 
-    void pop_frame(value DEBUG_CODE(r), type DEBUG_CODE(t)) {
+    void pop_frame(value const & DEBUG_CODE(r), type const & DEBUG_CODE(t)) {
         m_arg_stack.resize(get_frame().m_arg_bp);
         m_jp_stack.resize(get_frame().m_jp_bp);
         m_call_stack.pop_back();
