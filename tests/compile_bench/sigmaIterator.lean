@@ -1,6 +1,7 @@
 module
 
 public import Std
+import all Std.Data.Iterators.Producers.Range
 
 /-!
 This benchmark implements an iterator with a `Sigma` state, where the types of the second component

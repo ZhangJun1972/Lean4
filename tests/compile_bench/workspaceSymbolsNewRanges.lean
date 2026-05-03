@@ -20,6 +20,7 @@ just use `TermElabM` to extract the list of symbols from the environment.
 module
 public import Lean.Elab.Term
 meta import Lean.Elab.Term.TermElabM
+meta import Lean.Compiler.LCNF.Types
 
 @[specialize] private def iterateLookaround (f : (Option Char × Char × Option Char) → α) (string : String) : Array α :=
   if string.isEmpty then

@@ -109,6 +109,10 @@ public structure ModuleExportInfo where
 /-- **For internal use only.** Information useful to importers of this module. -/
 builtin_facet exportInfo : Module => ModuleExportInfo
 
+/-- **For internal use only.** Like `exportInfo` but also depends on `leanIR`, ensuring
+`.ir`/`.lcnf` files exist. Used by `fetchTransImportArts` for `meta import` dependencies. -/
+builtin_facet metaExportInfo : Module => ModuleExportInfo
+
 /-- Artifacts directly needed for an `import` of this module with the module system enabled. -/
 builtin_facet importArts : Module => ImportArtifacts
 
@@ -126,6 +130,15 @@ Its trace just includes its dependencies.
 -/
 builtin_facet leanArts : Module => ModuleOutputArtifacts
 
+/-- The IR compilation step (`leanir`), producing `.ir`, `.lcnf`, `.c`. Separate from `leanArts`
+for module system builds, enabling incremental rebuilds. -/
+builtin_facet leanIR : Module => ModuleOutputArtifacts
+
+/-- **For internal use only.** Combines `setup` with direct imports' `leanIR` so that
+`recBuildLeanIR` can wait for all prerequisites via a single `.fetch` (matching how master's
+`recBuildLean` waits for deps implicitly via the setup chain). -/
+builtin_facet irSetup : Module => ModuleSetup
+
 /-- A compressed archive (produced via `leantar`) of the module's build artifacts. -/
 builtin_facet ltar : Module => FilePath
 
@@ -140,6 +153,9 @@ builtin_facet oleanPrivateFacet @ olean.private : Module => FilePath
 
 /-- The `ilean` file produced by `lean`. -/
 builtin_facet ilean : Module => FilePath
+
+/-- The `ir.sig` file produced by `lean` (with the module system enabled). -/
+builtin_facet irSigFacet @ ir.sig : Module => FilePath
 
 /-- The `ir` file produced by `lean` (with the module system enabled). -/
 builtin_facet ir : Module => FilePath
