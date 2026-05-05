@@ -98,13 +98,13 @@ info: 0
 #eval code.v1.utLocalIndicators.size
 
 /--
-info: zoned("1969-12-31T21:00:00.000000000-03:00")
+info: zoned("1969-12-31T21:00:00.000000000-03:00[America/Sao_Paulo]")
 -/
 #guard_msgs in
 #eval ZonedDateTime.ofTimestamp (Timestamp.ofSecondsSinceUnixEpoch 0) rules
 
 /--
-info: zoned("2012-12-10T00:35:47.000000000-02:00")
+info: zoned("2012-12-10T00:35:47.000000000-02:00[America/Sao_Paulo]")
 -/
 #guard_msgs in
 #eval ZonedDateTime.ofTimestamp (Timestamp.ofSecondsSinceUnixEpoch 1355106947) rules

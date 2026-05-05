@@ -45,4 +45,4 @@ example : Std.LawfulBEqOrd (DateTime TimeZone.GMT) := inferInstance
    "Sat Jan 01 02:01:01 2025",
    "Sat Jan 02 01:01:01 2025",
    "Sat Feb 01 01:01:01 2025",
-   "Sat Jan 01 01:01:01 2026"].map (DateTime.fromAscTimeString . |>.toOption.get!)
+   "Sat Jan 01 01:01:01 2026"].map (DateTime.parse · |>.toOption.get!)

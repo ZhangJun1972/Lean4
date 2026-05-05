@@ -2,9 +2,9 @@ import Std.Time
 open Std.Time
 
 
-def ISO8601UTCAllow : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ", { allowLeapSeconds := true })
-def ISO8601UTCNot : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ", { allowLeapSeconds := false })
-def ISO8601UTCDef : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ")
+def ISO8601UTCAllow : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ", { allowLeapSeconds := true })
+def ISO8601UTCNot : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ", { allowLeapSeconds := false })
+def ISO8601UTCDef : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZ")
 
 /--
 info: Except.ok (zoned("2002-07-14T23:14:00.324354679-23:59"))

@@ -216,7 +216,7 @@ Transforms `Month.Ordinal` into `Second.Offset`.
 -/
 def toSeconds (leap : Bool) (month : Ordinal) : Second.Offset :=
   let daysAcc := #[0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-  let days : Day.Offset := daysAcc[month.toNat]!
+  let days : Day.Offset := daysAcc[month.toNat - 1]!
   let time := days.toSeconds
   if leap && month.toNat ≥ 2
     then time + 86400

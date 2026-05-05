@@ -410,8 +410,16 @@ def weekday (dt : DateTime tz) : Weekday :=
 /--
 Determines the era of the given `DateTime` based on its year.
 -/
+@[inline]
 def era (date : DateTime tz) : Year.Era :=
   date.year.era
+
+/--
+Returns the week-based year for a given `DateTime`.
+-/
+@[inline]
+def weekBasedYear (date : DateTime tz) : Year.Offset :=
+  date.date.get.weekBasedYear
 
 /--
 Sets the `DateTime` to the specified `desiredWeekday`.

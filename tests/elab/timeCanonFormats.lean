@@ -8,7 +8,7 @@ def date₁ := zoned("2014-06-16T03:03:03-03:00")
 info: "Monday, June 16, 2014 06:03:03"
 -/
 #guard_msgs in
-#eval Formats.longDateFormat.format date₁.toDateTime
+#eval Formats.longDateFormat.format date₁
 
 def tm := date₁.toTimestamp
 def date₂ := DateTime.ofTimestamp tm brTZ
@@ -134,7 +134,7 @@ info: "Mon, 16 Jun 2014 03:03:03 -0300"
 #eval Formats.rfc822.format date₂
 
 /--
-info: "Mon, 16-06-2014 03:03:03 -0300"
+info: "Mon, 16-Jun-14 03:03:03 -0300"
 -/
 #guard_msgs in
 #eval Formats.rfc850.format date₂

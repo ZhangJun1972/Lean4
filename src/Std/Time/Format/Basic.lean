@@ -6,7 +6,7 @@ Authors: Sofia Rodrigues
 module
 
 prelude
-public import Std.Time.Zoned
+public import Std.Time.Format.Modifier
 import Init.Data.String.TakeDrop
 import Init.Data.String.Search
 
@@ -23,496 +23,6 @@ open Std.Internal.Parsec.String
 open Std.Internal.Parsec Lean PlainTime PlainDate TimeZone DateTime
 
 set_option linter.all true
-
-
-/--
-`Text` represents different text formatting styles.
--/
-inductive Text
-  /-- Short form (e.g., "Tue") -/
-  | short
-  /-- Full form (e.g., "Tuesday") -/
-  | full
-  /-- Narrow form (e.g., "T") -/
-  | narrow
-  deriving Repr, Inhabited
-
-namespace Text
-
-/--
-`classify` classifies the number of pattern letters into a `Text` type.
--/
-def classify (num : Nat) : Option Text :=
-  if num < 4 then
-    some (.short)
-  else if num = 4 then
-    some (.full)
-  else if num = 5 then
-    some (.narrow)
-  else
-    none
-
-end Text
-
-/--
-`Number` represents different number formatting styles.
--/
-structure Number where
-  /--
-  The number of digits to pad, based on the count of pattern letters.
-  -/
-  padding : Nat
-  deriving Repr, Inhabited
-
-/--
-`classifyNumberText` classifies the number of pattern letters into either a `Number` or `Text`.
--/
-def classifyNumberText : Nat → Option (Number ⊕ Text)
-  | n => if n < 3 then some (.inl ⟨n⟩) else .inr <$> (Text.classify n)
-
-/--
-`Fraction` represents the fraction of a second, which can either be full nanoseconds
-or a truncated form with fewer digits.
--/
-inductive Fraction
-  /-- Nanosecond precision (up to 9 digits) -/
-  | nano
-  /-- Fewer digits (truncated precision) -/
-  | truncated (digits : Nat)
-  deriving Repr, Inhabited
-
-namespace Fraction
-
-/--
-`classify` classifies the number of pattern letters into either a `Fraction`. It's used for `nano`.
--/
-def classify (nat : Nat) : Option Fraction :=
-  if nat < 9 then
-    some (.truncated nat)
-  else if nat = 9 then
-    some (.nano)
-  else
-    none
-
-end Fraction
-
-/--
-`Year` represents different year formatting styles based on the number of pattern letters.
--/
-inductive Year
-  /-- Any size (e.g., "19000000000000") -/
-  | any
-  /-- Two-digit year format (e.g., "23" for 2023) -/
-  | twoDigit
-  /-- Four-digit year format (e.g., "2023") -/
-  | fourDigit
-  /-- Extended year format for more than 4 digits (e.g., "002023") -/
-  | extended (num : Nat)
-  deriving Repr, Inhabited
-
-namespace Year
-
-/--
-`classify` classifies the number of pattern letters into a `Year` format.
--/
-def classify (num : Nat) : Option Year :=
-  if num = 1 then
-    some .any
-  else if num = 2 then
-    some .twoDigit
-  else if num = 4 then
-    some .fourDigit
-  else if num > 4 ∨ num = 3 then
-    some (.extended num)
-  else
-    none
-
-end Year
-
-/--
-`ZoneId` represents different time zone ID formats based on the number of pattern letters.
--/
-inductive ZoneId
-  /-- Short form of time zone (e.g., "PST") -/
-  | short
-  /-- Full form of time zone (e.g., "Pacific Standard Time") -/
-  | full
-  deriving Repr, Inhabited
-
-namespace ZoneId
-
-/--
-`classify` classifies the number of pattern letters into a `ZoneId` format.
-- If 2 letters, it returns the short form.
-- If 4 letters, it returns the full form.
-- Otherwise, it returns none.
--/
-def classify (num : Nat) : Option ZoneId :=
-  if num = 2 then
-    some (.short)
-  else if num = 4 then
-    some (.full)
-  else
-    none
-
-end ZoneId
-
-/--
-`ZoneName` represents different zone name formats based on the number of pattern letters and
-whether daylight saving time is considered.
--/
-inductive ZoneName
-  /-- Short form of zone name (e.g., "PST") -/
-  | short
-  /-- Full form of zone name (e.g., "Pacific Standard Time") -/
-  | full
-  deriving Repr, Inhabited
-
-namespace ZoneName
-
-/--
-`classify` classifies the number of pattern letters and the letter type ('z' or 'v')
-into a `ZoneName` format.
-- For 'z', if less than 4 letters, it returns the short form; if 4 letters, it returns the full form.
-- For 'v', if 1 letter, it returns the short form; if 4 letters, it returns the full form.
-- Otherwise, it returns none.
--/
-def classify (letter : Char) (num : Nat) : Option ZoneName :=
-  if letter = 'z' then
-    if num < 4 then
-      some (.short)
-    else if num = 4 then
-      some (.full)
-    else
-      none
-  else if letter = 'v' then
-    if num = 1 then
-      some (.short)
-    else if num = 4 then
-      some (.full)
-    else
-      none
-  else
-    none
-
-end ZoneName
-
-/--
-`OffsetX` represents different offset formats based on the number of pattern letters.
-The output will vary between the number of pattern letters, whether it's the hour, minute, second,
-and whether colons are used.
--/
-inductive OffsetX
-  /-- Only the hour is output (e.g., "+01") -/
-  | hour
-  /-- Hour and minute without colon (e.g., "+0130") -/
-  | hourMinute
-  /-- Hour and minute with colon (e.g., "+01:30") -/
-  | hourMinuteColon
-  /-- Hour, minute, and second without colon (e.g., "+013015") -/
-  | hourMinuteSecond
-  /-- Hour, minute, and second with colon (e.g., "+01:30:15") -/
-  | hourMinuteSecondColon
-  deriving Repr, Inhabited
-
-namespace OffsetX
-
-/--
-`classify` classifies the number of pattern letters into an `OffsetX` format.
--/
-def classify (num : Nat) : Option OffsetX :=
-  if num = 1 then
-    some (.hour)
-  else if num = 2 then
-    some (.hourMinute)
-  else if num = 3 then
-    some (.hourMinuteColon)
-  else if num = 4 then
-    some (.hourMinuteSecond)
-  else if num = 5 then
-    some (.hourMinuteSecondColon)
-  else
-    none
-
-end OffsetX
-
-/--
-`OffsetO` represents localized offset text formats based on the number of pattern letters.
--/
-inductive OffsetO
-  /-- Short form of the localized offset (e.g., "GMT+8") -/
-  | short
-  /-- Full form of the localized offset (e.g., "GMT+08:00") -/
-  | full
-  deriving Repr, Inhabited
-
-namespace OffsetO
-
-/--
-`classify` classifies the number of pattern letters into an `OffsetO` format.
--/
-def classify (num : Nat) : Option OffsetO :=
-  match num with
-  | 1 => some (.short)
-  | 4 => some (.full)
-  | _ => none
-
-end OffsetO
-
-/--
-`OffsetZ` represents different offset formats based on the number of pattern letters (capital 'Z').
--/
-inductive OffsetZ
-  /-- Hour and minute without colon (e.g., "+0130") -/
-  | hourMinute
-  /-- Localized offset text in full form (e.g., "GMT+08:00") -/
-  | full
-  /-- Hour, minute, and second with colon (e.g., "+01:30:15") -/
-  | hourMinuteSecondColon
-  deriving Repr, Inhabited
-
-namespace OffsetZ
-
-/--
-`classify` classifies the number of pattern letters into an `OffsetZ` format.
--/
-def classify (num : Nat) : Option OffsetZ :=
-  match num with
-  | 1 | 2 | 3 => some (.hourMinute)
-  | 4 => some (.full)
-  | 5 => some (.hourMinuteSecondColon)
-  | _ => none
-
-end OffsetZ
-
-/--
-The `Modifier` inductive type represents various formatting options for date and time components,
-matching the format symbols used in date and time strings.
-These modifiers can be applied in formatting functions to generate custom date and time outputs.
--/
-inductive Modifier
-  /--
-  `G`: Era (e.g., AD, Anno Domini, A).
-  -/
-  | G (presentation : Text)
-
-  /--
-  `y`: Year of era (e.g., 2004, 04, 0002, 2).
-  -/
-  | y (presentation : Year)
-
-  /--
-  `u`: Year (e.g., 2004, 04, -0001, -1).
-  -/
-  | u (presentation : Year)
-
-  /--
-  `D`: Day of year (e.g., 189).
-  -/
-  | D (presentation : Number)
-
-  /--
-  `M`: Month of year as number or text (e.g., 7, 07, Jul, July, J).
-  -/
-  | MorL (presentation : Number ⊕ Text)
-
-  /--
-  `d`: Day of month (e.g., 10).
-  -/
-  | d (presentation : Number)
-
-  /--
-  `Q`: Quarter of year as number or text (e.g., 3, 03, Q3, 3rd quarter).
-  -/
-  | Qorq (presentation : Number ⊕ Text)
-
-  /--
-  `w`: Week of week-based year (e.g., 27).
-  -/
-  | w (presentation : Number)
-
-  /--
-  `W`: Week of month (e.g., 4).
-  -/
-  | W (presentation : Number)
-
-  /--
-  `E`: Day of week as text (e.g., Tue, Tuesday, T).
-  -/
-  | E (presentation : Text)
-
-  /--
-  `e`: Localized day of week as number or text (e.g., 2, 02, Tue, Tuesday, T).
-  -/
-  | eorc (presentation : Number ⊕ Text)
-
-  /--
-  `F`: Aligned week of month (e.g., 3).
-  -/
-  | F (presentation : Number)
-
-  /--
-  `a`: AM/PM of day (e.g., PM).
-  -/
-  | a (presentation : Text)
-
-  /--
-  `h`: Clock hour of AM/PM (1-12) (e.g., 12).
-  -/
-  | h (presentation : Number)
-
-  /--
-  `K`: Hour of AM/PM (0-11) (e.g., 0).
-  -/
-  | K (presentation : Number)
-
-  /--
-  `k`: Clock hour of day (1-24) (e.g., 24).
-  -/
-  | k (presentation : Number)
-
-  /--
-  `H`: Hour of day (0-23) (e.g., 0).
-  -/
-  | H (presentation : Number)
-
-  /--
-  `m`: Minute of hour (e.g., 30).
-  -/
-  | m (presentation : Number)
-
-  /--
-  `s`: Second of minute (e.g., 55).
-  -/
-  | s (presentation : Number)
-
-  /--
-  `S`: Fraction of second (e.g., 978).
-  -/
-  | S (presentation : Fraction)
-
-  /--
-  `A`: Millisecond of day (e.g., 1234).
-  -/
-  | A (presentation : Number)
-
-  /--
-  `n`: Nanosecond of second (e.g., 987654321).
-  -/
-  | n (presentation : Number)
-
-  /--
-  `N`: Nanosecond of day (e.g., 1234000000).
-  -/
-  | N (presentation : Number)
-
-  /--
-  `V`: Time zone ID (e.g., America/Los_Angeles, Z, -08:30).
-  -/
-  | V
-
-  /--
-  `z`: Time zone name (e.g., Pacific Standard Time, PST).
-  -/
-  | z (presentation : ZoneName)
-
-  /--
-  `O`: Localized zone offset (e.g., GMT+8, GMT+08:00, UTC-08:00).
-  -/
-  | O (presentation : OffsetO)
-
-  /--
-  `X`: Zone offset with 'Z' for zero (e.g., Z, -08, -0830, -08:30).
-  -/
-  | X (presentation : OffsetX)
-
-  /--
-  `x`: Zone offset without 'Z' (e.g., +0000, -08, -0830, -08:30).
-  -/
-  | x (presentation : OffsetX)
-
-  /--
-  `Z`: Zone offset with 'Z' for UTC (e.g., +0000, -0800, -08:00).
-  -/
-  | Z (presentation : OffsetZ)
-  deriving Repr, Inhabited
-
-/--
-`abstractParse` abstracts the parsing logic for any type that has a classify function.
-It takes a constructor function to build the `Modifier` and a classify function that maps the pattern length to a specific type.
--/
-private def parseMod (constructor : α → Modifier) (classify : Nat → Option α) (p : String) : Parser Modifier :=
-  let len := p.length
-  match classify len with
-  | some res => pure (constructor res)
-  | none => fail s!"invalid quantity of characters for '{p.front}'"
-
-private def parseText (constructor : Text → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor Text.classify p
-
-private def parseFraction (constructor : Fraction → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor Fraction.classify p
-
-private def parseNumber (constructor : Number → Modifier) (p : String) : Parser Modifier :=
-  pure (constructor ⟨p.length⟩)
-
-private def parseYear (constructor : Year → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor Year.classify p
-
-private def parseOffsetX (constructor : OffsetX → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor OffsetX.classify p
-
-private def parseOffsetZ (constructor : OffsetZ → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor OffsetZ.classify p
-
-private def parseOffsetO (constructor : OffsetO → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor OffsetO.classify p
-
-private def parseZoneId (p : String) : Parser Modifier :=
-  if p.length = 2 then pure .V else fail s!"invalid quantity of characters for '{p.front}'"
-
-private def parseNumberText (constructor : (Number ⊕ Text) → Modifier) (p : String) : Parser Modifier :=
-  parseMod constructor classifyNumberText p
-
-private def parseZoneName (constructor : ZoneName → Modifier) (p : String) : Parser Modifier :=
-  let len := p.length
-  match ZoneName.classify (p.front) len with
-  | some res => pure (constructor res)
-  | none => fail s!"invalid quantity of characters for '{p.front}'"
-
-private def parseModifier : Parser Modifier
-  := (parseText Modifier.G =<< many1Chars (pchar 'G'))
-  <|> parseYear Modifier.y =<< many1Chars (pchar 'y')
-  <|> parseYear Modifier.u =<< many1Chars (pchar 'u')
-  <|> parseNumber Modifier.D =<< many1Chars (pchar 'D')
-  <|> parseNumberText Modifier.MorL =<< many1Chars (pchar 'M')
-  <|> parseNumberText Modifier.MorL =<< many1Chars (pchar 'L')
-  <|> parseNumber Modifier.d =<< many1Chars (pchar 'd')
-  <|> parseNumberText Modifier.Qorq =<< many1Chars (pchar 'Q')
-  <|> parseNumberText Modifier.Qorq =<< many1Chars (pchar 'q')
-  <|> parseNumber Modifier.w =<< many1Chars (pchar 'w')
-  <|> parseNumber Modifier.W =<< many1Chars (pchar 'W')
-  <|> parseText Modifier.E =<< many1Chars (pchar 'E')
-  <|> parseNumberText Modifier.eorc =<< many1Chars (pchar 'e')
-  <|> parseNumberText Modifier.eorc =<< many1Chars (pchar 'c')
-  <|> parseNumber Modifier.F =<< many1Chars (pchar 'F')
-  <|> parseText Modifier.a =<< many1Chars (pchar 'a')
-  <|> parseNumber Modifier.h =<< many1Chars (pchar 'h')
-  <|> parseNumber Modifier.K =<< many1Chars (pchar 'K')
-  <|> parseNumber Modifier.k =<< many1Chars (pchar 'k')
-  <|> parseNumber Modifier.H =<< many1Chars (pchar 'H')
-  <|> parseNumber Modifier.m =<< many1Chars (pchar 'm')
-  <|> parseNumber Modifier.s =<< many1Chars (pchar 's')
-  <|> parseFraction Modifier.S =<< many1Chars (pchar 'S')
-  <|> parseNumber Modifier.A =<< many1Chars (pchar 'A')
-  <|> parseNumber Modifier.n =<< many1Chars (pchar 'n')
-  <|> parseNumber Modifier.N =<< many1Chars (pchar 'N')
-  <|> parseZoneId =<< many1Chars (pchar 'V')
-  <|> parseZoneName Modifier.z =<< many1Chars (pchar 'z')
-  <|> parseOffsetO Modifier.O =<< many1Chars (pchar 'O')
-  <|> parseOffsetX Modifier.X =<< many1Chars (pchar 'X')
-  <|> parseOffsetX Modifier.x =<< many1Chars (pchar 'x')
-  <|> parseOffsetZ Modifier.Z =<< many1Chars (pchar 'Z')
 
 /--
 The part of a formatting string. A string is just a text and a modifier is in the format described in
@@ -545,9 +55,15 @@ abbrev FormatString := List FormatPart
 If the format is aware of some timezone data it parses or if it parses any timezone.
 -/
 inductive Awareness
-  /-- The format only parses a single timezone. -/
+
+  /--
+  The format only parses a single timezone.
+  -/
   | only : TimeZone → Awareness
-  /-- The format parses any timezone. -/
+
+  /--
+  The format parses any timezone.
+  -/
   | any
 
 namespace Awareness
@@ -589,7 +105,7 @@ deriving Inhabited, Repr
 /--
 A specification on how to format a data or parse some string.
 -/
-structure GenericFormat (awareness : Awareness) where
+structure Format (awareness : Awareness) where
   /--
   Configuration options for formatting behavior.
   -/
@@ -639,6 +155,9 @@ private def rightTruncate (size : Nat)  (n : Int) (cut : Bool := false) : String
     sign ++ if cut then numStr.take size |>.copy else numStr
   else
     sign ++ rightPad size '0' numStr
+
+/- Locale-sensitive: will be parameterized by a LocaleSymbols structure. -/
+section Locale
 
 private def formatMonthLong : Month.Ordinal → String
   | ⟨1, _⟩ => "January"
@@ -710,16 +229,16 @@ private def formatWeekdayNarrow : Weekday → String
   | .saturday => "S"
 
 private def formatEraShort : Year.Era → String
-  | .bce => "BCE"
-  | .ce  => "CE"
+  | .bce => "BC"
+  | .ce  => "AD"
 
 private def formatEraLong : Year.Era → String
-  | .bce => "Before Common Era"
-  | .ce  => "Common Era"
+  | .bce => "Before Christ"
+  | .ce  => "Anno Domini"
 
 private def formatEraNarrow : Year.Era → String
   | .bce => "B"
-  | .ce  => "C"
+  | .ce  => "A"
 
 private def formatQuarterNumber : Month.Quarter → String
   |⟨1, _⟩ => "1"
@@ -746,16 +265,49 @@ private def formatMarkerShort (marker : HourMarker) : String :=
 
 private def formatMarkerLong (marker : HourMarker) : String :=
   match marker with
-  | .am => "Ante Meridiem"
-  | .pm => "Post Meridiem"
+  | .am => "ante meridiem"
+  | .pm => "post meridiem"
 
 private def formatMarkerNarrow (marker : HourMarker) : String :=
   match marker with
-  | .am => "A"
-  | .pm => "P"
+  | .am => "a"
+  | .pm => "p"
 
-private def toSigned (data : Int) : String :=
-  if data < 0 then toString data else "+" ++ toString data
+private def formatDayPeriodShort : DayPeriod → String
+  | .am => "AM"
+  | .pm => "PM"
+  | .noon => "noon"
+  | .midnight => "midnight"
+
+private def formatDayPeriodLong : DayPeriod → String
+  | .am => "AM"
+  | .pm => "PM"
+  | .noon => "noon"
+  | .midnight => "midnight"
+
+private def formatDayPeriodNarrow : DayPeriod → String
+  | .am => "a"
+  | .pm => "p"
+  | .noon => "n"
+  | .midnight => "mi"
+
+private def formatExtendedDayPeriodShort : ExtendedDayPeriod → String
+  | .midnight => "midnight"
+  | .night => "at night"
+  | .morning => "in the morning"
+  | .noon => "noon"
+  | .afternoon => "in the afternoon"
+  | .evening => "in the evening"
+
+private def formatExtendedDayPeriodNarrow : ExtendedDayPeriod → String
+  | .midnight => "mi"
+  | .night => "at night"
+  | .morning => "in the morning"
+  | .noon => "n"
+  | .afternoon => "in the afternoon"
+  | .evening => "in the evening"
+
+end Locale
 
 private def toIsoString (offset : Offset) (withMinutes : Bool) (withSeconds : Bool) (colon : Bool) : String :=
   let (sign, time) := if offset.second.val ≥ 0 then ("+", offset.second) else ("-", -offset.second)
@@ -768,22 +320,63 @@ private def toIsoString (offset : Offset) (withMinutes : Bool) (withSeconds : Bo
 
   data
 
+private def toLocalizedGMT (offset : Offset) (full : Bool) : String :=
+  if offset.second.val = 0 then
+    "GMT"
+  else
+    let (sign, time) := if offset.second.val ≥ 0 then ("+", offset.second) else ("-", -offset.second)
+    let time := PlainTime.ofSeconds time
+    let hour :=
+      if full then
+        leftPad 2 '0' (toString time.hour.val)
+      else
+        toString time.hour.val
+    let hasMinute := full ∨ time.minute.val ≠ 0 ∨ time.second.val ≠ 0
+    let withMinute :=
+      if hasMinute then
+        s!"GMT{sign}{hour}:{leftPad 2 '0' (toString time.minute.val)}"
+      else
+        s!"GMT{sign}{hour}"
+    if time.second.val ≠ 0 then
+      s!"{withMinute}:{leftPad 2 '0' (toString time.second.val)}"
+    else
+      withMinute
+
+private def isUTCLabel (input : String) : Bool :=
+  input = "Z"
+  ∨ input = "UTC"
+  ∨ input = "GMT"
+  ∨ input = "+00"
+  ∨ input = "+0000"
+  ∨ input = "+00:00"
+  ∨ input = "GMT+0"
+  ∨ input = "GMT+00:00"
+
+private def normalizeZoneName (input : String) (_ : Bool) : String :=
+  if isUTCLabel input then "Z" else input
+
 set_option linter.missingDocs false in  -- TODO
 @[expose /- for codegen -/]
 def TypeFormat : Modifier → Type
   | .G _ => Year.Era
   | .y _ => Year.Offset
+  | .Y _ => Year.Offset
   | .u _ => Year.Offset
   | .D _ => Sigma Day.Ordinal.OfYear
-  | .MorL _ => Month.Ordinal
+  | .M _ => Month.Ordinal
+  | .L _ => Month.Ordinal
   | .d _ => Day.Ordinal
-  | .Qorq _ => Month.Quarter
+  | .Q _ => Month.Quarter
+  | .q _ => Month.Quarter
   | .w _ => Week.Ordinal
   | .W _ => Week.Ordinal.OfMonth
   | .E _ => Weekday
-  | .eorc _ => Weekday
+  | .e _ => Weekday
+  | .c _ => Weekday
   | .F _ => Bounded.LE 1 5
   | .a _ => HourMarker
+  | .b _ => DayPeriod
+  | .B _ => ExtendedDayPeriod
   | .h _ => Bounded.LE 1 12
   | .K _ => Bounded.LE 0 11
   | .k _ => Bounded.LE 1 24
@@ -794,8 +387,9 @@ def TypeFormat : Modifier → Type
   | .A _ => Millisecond.Offset
   | .n _ => Nanosecond.Ordinal
   | .N _ => Nanosecond.Offset
-  | .V => String
+  | .V _ => String
   | .z _ => String
+  | .v _ => String
   | .O _ => Offset
   | .X _ => Offset
   | .x _ => Offset
@@ -808,11 +402,20 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
     | .short => formatEraShort data
     | .full => formatEraLong data
     | .narrow => formatEraNarrow data
+    | .twoLetterShort => formatEraShort data
   | .y format =>
     let info := data.toInt
     let info := if info ≤ 0 then -info + 1 else info
     match format with
-    | .any => pad 0 (data.toInt)
+    | .any => pad 0 info
+    | .twoDigit => pad 2 (info % 100)
+    | .fourDigit => pad 4 info
+    | .extended n => pad n info
+  | .Y format =>
+    let info := data.toInt
+    let info := if info ≤ 0 then -info + 1 else info
+    match format with
+    | .any => pad 0 info
     | .twoDigit => pad 2 (info % 100)
     | .fourDigit => pad 4 info
     | .extended n => pad n info
@@ -824,20 +427,22 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
     | .extended n => pad n data.toInt
   | .D format =>
     pad format.padding data.snd.val
-  | .MorL format =>
+  | .M format | .L format =>
     match format with
     | .inl format => pad format.padding data.val
     | .inr .short => formatMonthShort data
     | .inr .full => formatMonthLong data
     | .inr .narrow => formatMonthNarrow data
+    | .inr .twoLetterShort => formatMonthShort data
   | .d format =>
     pad format.padding data.val
-  | .Qorq format =>
+  | .Q format | .q format =>
     match format with
     | .inl format => pad format.padding data.val
     | .inr .short => formatQuarterShort data
     | .inr .full => formatQuarterLong data
     | .inr .narrow => formatQuarterNumber data
+    | .inr .twoLetterShort => formatQuarterShort data
   | .w format =>
     pad format.padding data.val
   | .W format =>
@@ -847,12 +452,30 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
     | .short => formatWeekdayShort data
     | .full => formatWeekdayLong data
     | .narrow => formatWeekdayNarrow data
-  | .eorc format =>
+    | .twoLetterShort =>
+      match data with
+      | .sunday => "Su"
+      | .monday => "Mo"
+      | .tuesday => "Tu"
+      | .wednesday => "We"
+      | .thursday => "Th"
+      | .friday => "Fr"
+      | .saturday => "Sa"
+  | .e format | .c format =>
     match format with
     | .inl format => pad format.padding data.toOrdinal.val
     | .inr .short => formatWeekdayShort data
     | .inr .full => formatWeekdayLong data
     | .inr .narrow => formatWeekdayNarrow data
+    | .inr .twoLetterShort =>
+      match data with
+      | .sunday => "Su"
+      | .monday => "Mo"
+      | .tuesday => "Tu"
+      | .wednesday => "We"
+      | .thursday => "Th"
+      | .friday => "Fr"
+      | .saturday => "Sa"
   | .F format =>
     pad format.padding data.val
   | .a format =>
@@ -860,7 +483,18 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
     | .short => formatMarkerShort data
     | .full => formatMarkerLong data
     | .narrow => formatMarkerNarrow data
-  | .h format => pad format.padding (data.val % 12)
+    | .twoLetterShort => formatMarkerShort data
+  | .b format =>
+    match format with
+    | .short => formatDayPeriodShort data
+    | .full => formatDayPeriodLong data
+    | .narrow => formatDayPeriodNarrow data
+    | .twoLetterShort => formatDayPeriodShort data
+  | .B format =>
+    match format with
+    | .short | .full | .twoLetterShort => formatExtendedDayPeriodShort data
+    | .narrow => formatExtendedDayPeriodNarrow data
+  | .h format => pad format.padding data.val
   | .K format => pad format.padding (data.val % 12)
   | .k format => pad format.padding data.val
   | .H format => pad format.padding data.val
@@ -869,28 +503,35 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
   | .S format =>
     match format with
     | .nano => pad 9 data.val
-    | .truncated n => rightTruncate n data.val (cut := true)
+    | .truncated n => ((leftPad 9 '0' (toString data.val)).take n).toString
   | .A format =>
     pad format.padding data.val
   | .n format =>
     pad format.padding data.val
   | .N format =>
     pad format.padding data.val
-  | .V => data
+  | .V format =>
+    match format with
+    | .unknown => "unk"
+    | .short | .full => if isUTCLabel data then "Z" else data
   | .z format =>
     match format with
-    | .short => data
-    | .full => data
+    | .short => normalizeZoneName data false
+    | .full => normalizeZoneName data true
+  | .v format =>
+    match format with
+    | .short => normalizeZoneName data false
+    | .full => normalizeZoneName data true
   | .O format =>
     match format with
-    | .short => s!"GMT{toSigned data.second.toHours.toInt}"
-    | .full => s!"GMT{toIsoString data true false true}"
+    | .short => toLocalizedGMT data false
+    | .full => toLocalizedGMT data true
   | .X format =>
     if data.second == 0 then
       "Z"
     else
       match format with
-        | .hour => toIsoString data false false false
+        | .hour => toIsoString data (data.second.val % 3600 ≠ 0) false false
         | .hourMinute => toIsoString data true false false
         | .hourMinuteColon => toIsoString data true false true
         | .hourMinuteSecond => toIsoString data true true false
@@ -898,11 +539,11 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
   | .x format =>
     match format with
     | .hour =>
-      toIsoString data (data.second.toMinutes.val % 60 ≠ 0) false false
+      toIsoString data (data.second.val % 3600 ≠ 0) false false
     | .hourMinute =>
       toIsoString data true false false
     | .hourMinuteColon =>
-      toIsoString data true (data.second.val % 60 ≠ 0) true
+      toIsoString data true false true
     | .hourMinuteSecond =>
       toIsoString data true (data.second.val % 60 ≠ 0) false
     | .hourMinuteSecondColon =>
@@ -912,29 +553,54 @@ private def formatWith (modifier : Modifier) (data: TypeFormat modifier) : Strin
     | .hourMinute =>
       toIsoString data true false false
     | .full =>
-      if data.second.val = 0
-        then "GMT"
-        else s!"GMT{toIsoString data true false true}"
+      toLocalizedGMT data true
     | .hourMinuteSecondColon =>
       if data.second == 0
         then "Z"
-        else  toIsoString data true (data.second.val % 60 ≠ 0) true
+        else toIsoString data true true true
+
+
+
 
 private def dateFromModifier (date : DateTime tz) : TypeFormat modifier :=
   match modifier with
   | .G _ => date.era
   | .y _ => date.year
+  | .Y _ => date.date.get.date.weekBasedYear
   | .u _ => date.year
   | .D _ => Sigma.mk _ date.dayOfYear
-  | .MorL _ => date.month
+  | .M _ => date.month
+  | .L _ => date.month
   | .d _ => date.day
-  | .Qorq _ => date.quarter
-  | .w _ => date.weekOfYear
-  | .W _ => date.alignedWeekOfMonth
+  | .Q _ => date.quarter
+  | .q _ => date.quarter
+  | .w _ => date.date.get.date.weekOfYear
+  | .W _ => date.date.get.date.alignedWeekOfMonth .sunday
   | .E _ =>  date.weekday
-  | .eorc _ => date.weekday
+  | .e _ => date.weekday
+  | .c _ => date.weekday
   | .F _ => date.weekOfMonth
   | .a _ => HourMarker.ofOrdinal date.hour
+  | .b _ =>
+    let h := date.hour.val
+    let m := date.minute.val
+    let s := date.date.get.time.second.val
+    let n := date.nanosecond.val
+    if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+    else if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+    else if h < 12 then .am
+    else .pm
+  | .B _ =>
+    let h := date.hour.val
+    let m := date.minute.val
+    let s := date.date.get.time.second.val
+    let n := date.nanosecond.val
+    if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+    else if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+    else if h < 6 ∨ h ≥ 21 then .night
+    else if h < 12 then .morning
+    else if h < 18 then .afternoon
+    else .evening
   | .h _ => HourMarker.toRelative date.hour |>.fst
   | .K _ => date.hour.emod 12 (by decide)
   | .k _ => date.hour.shiftTo1BasedHour
@@ -945,13 +611,18 @@ private def dateFromModifier (date : DateTime tz) : TypeFormat modifier :=
   | .A _ => date.date.get.time.toMilliseconds
   | .n _ => date.nanosecond
   | .N _ => date.date.get.time.toNanoseconds
-  | .V => tz.name
+  | .V _ => tz.name
   | .z .short => tz.abbreviation
   | .z .full => tz.name
+  | .v .short => tz.abbreviation
+  | .v .full => tz.name
   | .O _ => tz.offset
   | .X _ => tz.offset
   | .x _ => tz.offset
   | .Z _ => tz.offset
+
+/- Locale-sensitive: will be parameterized by a LocaleSymbols structure. -/
+section Locale
 
 private def parseMonthLong : Parser Month.Ordinal
    := pstring "January" *> pure ⟨1, by decide⟩
@@ -984,15 +655,13 @@ def parseMonthShort : Parser Month.Ordinal
   <|> pstring "Nov" *> pure ⟨11, by decide⟩
   <|> pstring "Dec" *> pure ⟨12, by decide⟩
 
+-- Narrow month letters are inherently ambiguous (J=Jan/Jun/Jul, M=Mar/May, A=Apr/Aug).
+-- Parsing uses the first (earliest) month for each letter.
 private def parseMonthNarrow : Parser Month.Ordinal
-   := pstring "J" *> pure ⟨1, by decide⟩
+   := pstring "J" *> pure ⟨1, by decide⟩  -- Jan (Jun/Jul also start with J)
   <|> pstring "F" *> pure ⟨2, by decide⟩
-  <|> pstring "M" *> pure ⟨3, by decide⟩
-  <|> pstring "A" *> pure ⟨4, by decide⟩
-  <|> pstring "M" *> pure ⟨5, by decide⟩
-  <|> pstring "J" *> pure ⟨6, by decide⟩
-  <|> pstring "J" *> pure ⟨7, by decide⟩
-  <|> pstring "A" *> pure ⟨8, by decide⟩
+  <|> pstring "M" *> pure ⟨3, by decide⟩  -- Mar (May also starts with M)
+  <|> pstring "A" *> pure ⟨4, by decide⟩  -- Apr (Aug also starts with A)
   <|> pstring "S" *> pure ⟨9, by decide⟩
   <|> pstring "O" *> pure ⟨10, by decide⟩
   <|> pstring "N" *> pure ⟨11, by decide⟩
@@ -1016,26 +685,35 @@ private def parseWeekdayShort : Parser Weekday
   <|> pstring "Fri" *> pure Weekday.friday
   <|> pstring "Sat" *> pure Weekday.saturday
 
+-- Narrow weekday letters are inherently ambiguous (S=Sun/Sat, T=Tue/Thu).
+-- Parsing uses the first (earliest) weekday for each letter.
 private def parseWeekdayNarrow : Parser Weekday
-   := pstring "S" *> pure Weekday.sunday
+   := pstring "S" *> pure Weekday.sunday  -- Sun (Sat also starts with S)
   <|> pstring "M" *> pure Weekday.monday
-  <|> pstring "T" *> pure Weekday.tuesday
+  <|> pstring "T" *> pure Weekday.tuesday  -- Tue (Thu also starts with T)
   <|> pstring "W" *> pure Weekday.wednesday
-  <|> pstring "T" *> pure Weekday.thursday
   <|> pstring "F" *> pure Weekday.friday
-  <|> pstring "S" *> pure Weekday.saturday
+
+private def parseWeekdaytwoLetterShort : Parser Weekday
+   := pstring "Su" *> pure Weekday.sunday
+  <|> pstring "Mo" *> pure Weekday.monday
+  <|> pstring "Tu" *> pure Weekday.tuesday
+  <|> pstring "We" *> pure Weekday.wednesday
+  <|> pstring "Th" *> pure Weekday.thursday
+  <|> pstring "Fr" *> pure Weekday.friday
+  <|> pstring "Sa" *> pure Weekday.saturday
 
 private def parseEraShort : Parser Year.Era
-   := pstring "BCE" *> pure Year.Era.bce
-  <|> pstring "CE" *> pure Year.Era.ce
+   := pstring "BC" *> pure Year.Era.bce
+  <|> pstring "AD" *> pure Year.Era.ce
 
 private def parseEraLong : Parser Year.Era
-   := pstring "Before Common Era" *> pure Year.Era.bce
-  <|> pstring "Common Era" *> pure Year.Era.ce
+   := pstring "Before Christ" *> pure Year.Era.bce
+  <|> pstring "Anno Domini" *> pure Year.Era.ce
 
 private def parseEraNarrow : Parser Year.Era
    := pstring "B" *> pure Year.Era.bce
-  <|> pstring "C" *> pure Year.Era.ce
+  <|> pstring "A" *> pure Year.Era.ce
 
 private def parseQuarterNumber : Parser Month.Quarter
    := pstring "1" *> pure ⟨1, by decide⟩
@@ -1060,12 +738,57 @@ private def parseMarkerShort : Parser HourMarker
   <|> pstring "PM" *> pure HourMarker.pm
 
 private def parseMarkerLong : Parser HourMarker
-   := pstring "Ante Meridiem" *> pure HourMarker.am
-  <|> pstring "Post Meridiem" *> pure HourMarker.pm
+   := pstring "ante meridiem" *> pure HourMarker.am
+  <|> pstring "post meridiem" *> pure HourMarker.pm
+  <|> parseMarkerShort
 
 private def parseMarkerNarrow : Parser HourMarker
    := pstring "A" *> pure HourMarker.am
+  <|> pstring "a" *> pure HourMarker.am
   <|> pstring "P" *> pure HourMarker.pm
+  <|> pstring "p" *> pure HourMarker.pm
+
+private def parseDayPeriodShort : Parser DayPeriod
+   := pstring "noon"     *> pure DayPeriod.noon
+  <|> pstring "midnight" *> pure DayPeriod.midnight
+  <|> pstring "AM"       *> pure DayPeriod.am
+  <|> pstring "PM"       *> pure DayPeriod.pm
+
+private def parseDayPeriodLong : Parser DayPeriod
+   := pstring "noon"          *> pure DayPeriod.noon
+  <|> pstring "midnight"      *> pure DayPeriod.midnight
+  <|> pstring "AM"            *> pure DayPeriod.am
+  <|> pstring "PM"            *> pure DayPeriod.pm
+  <|> pstring "ante meridiem" *> pure DayPeriod.am
+  <|> pstring "post meridiem" *> pure DayPeriod.pm
+
+private def parseDayPeriodNarrow : Parser DayPeriod
+   := pstring "midnight" *> pure DayPeriod.midnight
+  <|> pstring "noon"     *> pure DayPeriod.noon
+  <|> pstring "mi"       *> pure DayPeriod.midnight
+  <|> pstring "n"        *> pure DayPeriod.noon
+  <|> pstring "a"        *> pure DayPeriod.am
+  <|> pstring "p"        *> pure DayPeriod.pm
+
+private def parseExtendedDayPeriodShort : Parser ExtendedDayPeriod
+   := pstring "midnight"          *> pure .midnight
+  <|> pstring "at night"          *> pure .night
+  <|> pstring "in the morning"    *> pure .morning
+  <|> pstring "noon"              *> pure .noon
+  <|> pstring "in the afternoon"  *> pure .afternoon
+  <|> pstring "in the evening"    *> pure .evening
+
+private def parseExtendedDayPeriodNarrow : Parser ExtendedDayPeriod
+   := pstring "midnight"          *> pure .midnight
+  <|> pstring "mi"                *> pure .midnight
+  <|> pstring "at night"          *> pure .night
+  <|> pstring "in the morning"    *> pure .morning
+  <|> pstring "noon"              *> pure .noon
+  <|> pstring "n"                 *> pure .noon
+  <|> pstring "in the afternoon"  *> pure .afternoon
+  <|> pstring "in the evening"    *> pure .evening
+
+end Locale
 
 private def exactly (parse : Parser α) (size : Nat) : Parser (Array α) :=
   let rec go (acc : Array α) (count : Nat) : Parser (Array α) :=
@@ -1097,6 +820,11 @@ private def parseSigned (parser : Parser Nat) : Parser Int := do
 private def parseNum (size : Nat) : Parser Nat :=
   String.toNat! <$> exactlyChars (satisfy Char.isDigit) size
 
+private def parseNum1or2 : Parser Nat := do
+  let first ← exactlyChars (satisfy Char.isDigit) 1
+  let second ← optional (exactlyChars (satisfy Char.isDigit) 1)
+  pure <| String.toNat! (first ++ second.getD "")
+
 private def parseAtLeastNum (size : Nat) : Parser Nat :=
   String.toNat! <$> do
     let start ← exactlyChars (satisfy Char.isDigit) size
@@ -1124,9 +852,17 @@ private inductive Reason
   | no
   | optional
 
-private def parseOffset (withMinutes : Reason) (withSeconds : Reason) (withColon : Bool) : Parser Offset := do
+private inductive HourDigits
+  | two
+  | oneOrTwo
+
+private def parseOffset (withMinutes : Reason) (withSeconds : Reason) (withColon : Bool) (hourDigits := HourDigits.two) : Parser Offset := do
   let sign ← (pchar '+' *> pure 1) <|> (pchar '-' *> pure (-1))
-  let hours : Hour.Offset ← UnitVal.ofInt <$> parseNum 2
+  let hourParser : Parser Nat :=
+    match hourDigits with
+    | .two => parseNum 2
+    | .oneOrTwo => parseNum1or2
+  let hours : Hour.Offset ← UnitVal.ofInt <$> hourParser
 
   if hours.val < 0 ∨ hours.val > 23 then
     fail s!"invalid hour offset: {hours.val}. Must be between 0 and 23."
@@ -1155,38 +891,59 @@ private def parseOffset (withMinutes : Reason) (withSeconds : Reason) (withColon
 
   return Offset.ofSeconds ⟨hours.val * sign⟩
 
+private def parseLocalizedGMT (full : Bool) : Parser Offset := do
+  skipString "GMT"
+  let parseOff :=
+    match full with
+    | true => parseOffset .yes .optional true
+    | false => parseOffset .optional .optional true (hourDigits := .oneOrTwo)
+  let res ← optional parseOff
+  pure (res.getD Offset.zero)
+
 private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (TypeFormat mod)
   | .G format =>
     match format with
     | .short => parseEraShort
     | .full => parseEraLong
     | .narrow => parseEraNarrow
+    | .twoLetterShort => parseEraShort
   | .y format =>
     match format with
     | .any => Int.ofNat <$> parseAtLeastNum 1
     | .twoDigit => (2000 + ·) <$> Int.ofNat <$> parseNum 2
     | .fourDigit => Int.ofNat <$> parseNum 4
-    | .extended n => Int.ofNat <$> parseNum n
+    | .extended n =>
+      Int.ofNat <$> (if n = 3 then parseAtLeastNum 3 else parseNum n)
+  | .Y format =>
+    match format with
+    | .any => Int.ofNat <$> parseAtLeastNum 1
+    | .twoDigit => (2000 + ·) <$> Int.ofNat <$> parseNum 2
+    | .fourDigit => Int.ofNat <$> parseNum 4
+    | .extended n =>
+      Int.ofNat <$> (if n = 3 then parseAtLeastNum 3 else parseNum n)
   | .u format =>
     match format with
     | .any => parseSigned <| parseAtLeastNum 1
     | .twoDigit => (2000 + ·) <$> Int.ofNat <$> parseNum 2
     | .fourDigit => parseSigned <| parseNum 4
-    | .extended n => parseSigned <| parseNum n
+    | .extended n =>
+      parseSigned <| (if n = 3 then parseAtLeastNum 3 else parseNum n)
   | .D format => Sigma.mk true <$> parseNatToBounded (parseFlexibleNum format.padding)
-  | .MorL format =>
+  | .M format | .L format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
     | .inr .short => parseMonthShort
     | .inr .full => parseMonthLong
     | .inr .narrow => parseMonthNarrow
+    | .inr .twoLetterShort => parseMonthShort
   | .d format => parseNatToBounded (parseFlexibleNum format.padding)
-  | .Qorq format =>
+  | .Q format | .q format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
     | .inr .short => parseQuarterShort
     | .inr .full => parseQuarterLong
     | .inr .narrow => parseQuarterNumber
+    | .inr .twoLetterShort => parseQuarterShort
   | .w format => parseNatToBounded (parseFlexibleNum format.padding)
   | .W format => parseNatToBounded (parseFlexibleNum format.padding)
   | .E format =>
@@ -1194,18 +951,34 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
     | .short => parseWeekdayShort
     | .full => parseWeekdayLong
     | .narrow => parseWeekdayNarrow
-  | .eorc format =>
+    | .twoLetterShort => parseWeekdaytwoLetterShort
+  | .e format | .c format =>
     match format with
-    | .inl format => Weekday.ofOrdinal <$> parseNatToBounded (parseFlexibleNum format.padding)
+    | .inl format =>
+      -- Parse ISO ordinal (Mon=1..Sun=7) and convert to Weekday
+      Weekday.ofOrdinal <$>
+        (parseNatToBounded (parseFlexibleNum format.padding) : Parser Weekday.Ordinal)
     | .inr .short => parseWeekdayShort
     | .inr .full => parseWeekdayLong
     | .inr .narrow => parseWeekdayNarrow
+    | .inr .twoLetterShort => parseWeekdaytwoLetterShort
   | .F format => parseNatToBounded (parseFlexibleNum format.padding)
   | .a format =>
     match format with
     | .short => parseMarkerShort
     | .full => parseMarkerLong
     | .narrow => parseMarkerNarrow
+    | .twoLetterShort => parseMarkerShort
+  | .b format =>
+    match format with
+    | .short => parseDayPeriodShort
+    | .full => parseDayPeriodLong
+    | .narrow => parseDayPeriodNarrow
+    | .twoLetterShort => parseDayPeriodShort
+  | .B format =>
+    match format with
+    | .short | .full | .twoLetterShort => parseExtendedDayPeriodShort
+    | .narrow => parseExtendedDayPeriodNarrow
   | .h format => parseNatToBounded (parseFlexibleNum format.padding)
   | .K format => parseNatToBounded (parseFlexibleNum format.padding)
   | .k format => parseNatToBounded (parseFlexibleNum format.padding)
@@ -1224,23 +997,28 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
   | .A format => Millisecond.Offset.ofNat <$> (parseFlexibleNum format.padding)
   | .n format => parseNatToBounded (parseFlexibleNum format.padding)
   | .N format => Nanosecond.Offset.ofNat <$> (parseFlexibleNum format.padding)
-  | .V => parseIdentifier
+  | .V .unknown => pstring "unk" *> pure "unk"
+  | .V .short | .V .full => parseIdentifier
   | .z format =>
+    match format with
+    | .short => parseIdentifier
+    | .full => parseIdentifier
+  | .v format =>
     match format with
     | .short => parseIdentifier
     | .full => parseIdentifier
   | .O format =>
     match format with
-    | .short => pstring "GMT" *> parseOffset .no .no false
-    | .full => pstring "GMT" *> parseOffset .yes .optional false
+    | .short => parseLocalizedGMT false
+    | .full => parseLocalizedGMT true
   | .X format =>
     let p : Parser Offset :=
       match format with
-        | .hour => parseOffset .no .no false
+        | .hour => parseOffset .optional .no false
         | .hourMinute => parseOffset .yes .no false
         | .hourMinuteColon => parseOffset .yes .no true
-        | .hourMinuteSecond => parseOffset .yes .yes false
-        | .hourMinuteSecondColon => parseOffset .yes .yes true
+        | .hourMinuteSecond => parseOffset .yes .optional false
+        | .hourMinuteSecondColon => parseOffset .yes .optional true
     p <|> (pstring "Z" *> pure (Offset.ofSeconds 0))
   | .x format =>
     match format with
@@ -1249,19 +1027,17 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
     | .hourMinute =>
       parseOffset .yes .no false
     | .hourMinuteColon =>
-      parseOffset .yes .optional true
+      parseOffset .yes .no true
     | .hourMinuteSecond =>
       parseOffset .yes .optional false
     | .hourMinuteSecondColon =>
-      parseOffset .yes .yes true
+      parseOffset .yes .optional true
   | .Z format =>
     match format with
     | .hourMinute =>
-      parseOffset .yes .no false
-    | .full => do
-      skipString "GMT"
-      let res ← optional (parseOffset .yes .no true)
-      return res.getD Offset.zero
+      parseOffset .yes .optional false
+    | .full =>
+      parseLocalizedGMT true
     | .hourMinuteSecondColon =>
       (skipString "Z" *> pure Offset.zero)
       <|> (parseOffset .yes .optional true)
@@ -1278,22 +1054,25 @@ def FormatType (result : Type) : FormatString → Type
   | .string _ :: xs => (FormatType result xs)
   | [] => result
 
-namespace GenericFormat
+namespace Format
 
 private structure DateBuilder where
   G : Option Year.Era := none
   y : Option Year.Offset := none
+  Y : Option Year.Offset := none
   u : Option Year.Offset := none
   D : Option (Sigma Day.Ordinal.OfYear) := none
-  MorL : Option Month.Ordinal := none
+  month : Option Month.Ordinal := none
   d : Option Day.Ordinal := none
-  Qorq : Option Month.Quarter := none
+  quarter : Option Month.Quarter := none
   w : Option Week.Ordinal := none
-  W : Option Week.Ordinal.OfMonth := none
+  W : Option (Bounded.LE 1 6) := none
   E : Option Weekday := none
-  eorc : Option Weekday := none
+  weekday : Option Weekday := none
   F : Option (Bounded.LE 1 5) := none
   a : Option HourMarker := none
+  b : Option DayPeriod := none
+  B : Option ExtendedDayPeriod := none
   h : Option (Bounded.LE 1 12) := none
   K : Option (Bounded.LE 0 11) := none
   k : Option (Bounded.LE 1 24) := none
@@ -1307,6 +1086,8 @@ private structure DateBuilder where
   V : Option String := none
   z : Option String := none
   zabbrev : Option String := none
+  v : Option String := none
+  vabbrev : Option String := none
   O : Option Offset := none
   X : Option Offset := none
   x : Option Offset := none
@@ -1318,17 +1099,23 @@ private def insert (date : DateBuilder) (modifier : Modifier) (data : TypeFormat
   match modifier with
   | .G _ => { date with G := some data }
   | .y _ => { date with y := some data }
+  | .Y _ => { date with Y := some data }
   | .u _ => { date with u := some data }
   | .D _ => { date with D := some data }
-  | .MorL _ => { date with MorL := some data }
+  | .M _ => { date with month := some data }
+  | .L _ => { date with month := some data }
   | .d _ => { date with d := some data }
-  | .Qorq _ => { date with Qorq := some data }
+  | .Q _ => { date with quarter := some data }
+  | .q _ => { date with quarter := some data }
   | .w _ => { date with w := some data }
   | .W _ => { date with W := some data }
   | .E _ => { date with E := some data }
-  | .eorc _ => { date with eorc := some data }
+  | .e _ => { date with weekday := some data }
+  | .c _ => { date with weekday := some data }
   | .F _ => { date with F := some data }
   | .a _ => { date with a := some data }
+  | .b _ => { date with b := some data }
+  | .B _ => { date with B := some data }
   | .h _ => { date with h := some data }
   | .K _ => { date with K := some data }
   | .k _ => { date with k := some data }
@@ -1339,9 +1126,11 @@ private def insert (date : DateBuilder) (modifier : Modifier) (data : TypeFormat
   | .A _ => { date with A := some data }
   | .n _ => { date with n := some data }
   | .N _ => { date with N := some data }
-  | .V => { date with V := some data }
+  | .V _ => { date with V := some data }
   | .z .full => { date with z := some data }
   | .z .short => { date with zabbrev := some data }
+  | .v .full => { date with v := some data }
+  | .v .short => { date with vabbrev := some data }
   | .O _ => { date with O := some data }
   | .X _ => { date with X := some data }
   | .x _ => { date with x := some data }
@@ -1349,38 +1138,71 @@ private def insert (date : DateBuilder) (modifier : Modifier) (data : TypeFormat
 
 private def convertYearAndEra (year : Year.Offset) : Year.Era → Year.Offset
   | .ce => year
-  | .bce => -(year + 1)
+  | .bce => 1 - year
 
-private def build (builder : DateBuilder) (aw : Awareness) : Option aw.type :=
+private def build (builder : DateBuilder) (aw : Awareness) : Except String aw.type := do
   let offset := builder.O <|> builder.X <|> builder.x <|> builder.Z |>.getD Offset.zero
 
   let tz : TimeZone := {
     offset,
-    name := builder.V <|> builder.z |>.getD (offset.toIsoString true),
-    abbreviation := builder.zabbrev |>.getD (offset.toIsoString true),
+    name := builder.V <|> builder.z <|> builder.v |>.getD (offset.toIsoString true),
+    abbreviation := builder.zabbrev <|> builder.vabbrev |>.getD (offset.toIsoString true),
     isDST := false,
   }
 
-  let month := builder.MorL |>.getD 0
-  let day := builder.d |>.getD 0
   let era := (builder.G.getD .ce)
 
   let year
     := builder.u
+    <|> builder.Y
     <|> ((convertYearAndEra · era) <$> builder.y)
     |>.getD 0
 
+  let monthDay : Month.Ordinal × Day.Ordinal ←
+    match builder.D with
+    | none => pure (builder.month |>.getD ⟨1, by decide⟩, builder.d |>.getD ⟨1, by decide⟩)
+    | some ⟨_, doy⟩ =>
+      let v := doy.val
+      if h : v ≤ .ofNat (if year.isLeap then 366 else 365) then
+        let doy' : Day.Ordinal.OfYear year.isLeap := ⟨v, doy.property.1, h⟩
+        let date := PlainDate.ofYearOrdinal year doy'
+        pure (date.month, date.day)
+      else
+        throw s!"day {v} does not exist in year {year}"
+  let month := monthDay.1
+  let day := monthDay.2
+
   let hour : Option (Bounded.LE 0 23) :=
-    if let some marker := builder.a then
-      marker.toAbsolute <$> builder.h
-      <|> marker.toAbsolute <$> ((Bounded.LE.add · 1) <$> builder.K)
+    if let some period := builder.b then
+      match period with
+      | .noon => some ⟨12, by decide⟩
+      | .midnight => some ⟨0, by decide⟩
+      | .am => (HourMarker.am.toAbsolute <$> builder.h : Option (Bounded.LE 0 23))
+               <|> builder.K.map (·.expandTop (by decide))
+      | .pm => (HourMarker.pm.toAbsolute <$> builder.h : Option (Bounded.LE 0 23))
+               <|> builder.K.map (fun k => (k.add 12).expand (by decide) (by decide))
+    else if let some period := builder.B then
+      match period with
+      | .midnight => some ⟨0, by decide⟩
+      | .noon => some ⟨12, by decide⟩
+      | .morning | .night =>
+        (HourMarker.am.toAbsolute <$> builder.h : Option (Bounded.LE 0 23))
+        <|> builder.K.map (·.expandTop (by decide))
+      | .afternoon | .evening =>
+        (HourMarker.pm.toAbsolute <$> builder.h : Option (Bounded.LE 0 23))
+        <|> builder.K.map (fun k => (k.add 12).expand (by decide) (by decide))
+    else if let some marker := builder.a then
+      (marker.toAbsolute <$> builder.h : Option (Bounded.LE 0 23))
+      <|> match marker with
+          | .am => builder.K.map (·.expandTop (by decide))
+          | .pm => builder.K.map (fun k => (k.add 12).expand (by decide) (by decide))
     else
       none
 
   let hour :=
     hour <|> (
       let one : Option (Bounded.LE 0 23) := builder.H
-      let other : Option (Bounded.LE 0 23) := (Bounded.LE.sub · 1) <$> builder.k
+      let other : Option (Bounded.LE 0 23) := builder.k.map (·.emod 24 (by decide))
       (one <|> other))
       |>.getD ⟨0, by decide⟩
 
@@ -1400,9 +1222,11 @@ private def build (builder : DateBuilder) (aw : Awareness) : Option aw.type :=
     else
       none
 
-  match aw with
+  match (match aw with
     | .only newTz => (ofPlainDateTime · newTz) <$> datetime
-    | .any => (ZonedDateTime.ofPlainDateTime · (ZoneRules.ofTimeZone tz)) <$> datetime
+    | .any => (ZonedDateTime.ofPlainDateTime · (ZoneRules.ofTimeZone tz)) <$> datetime) with
+  | some res => .ok res
+  | none => .error "could not parse the date"
 
 end DateBuilder
 
@@ -1414,25 +1238,48 @@ private def parseWithDate (date : DateBuilder) (config : FormatConfig) (mod : Fo
   | .string s => pstring s *> pure date
 
 /--
-Constructs a new `GenericFormat` specification for a date-time string. Modifiers can be combined to create
+Constructs a new `Format` specification for a date-time string. Modifiers can be combined to create
 custom formats, such as "YYYY, MMMM, D".
 -/
-def spec (input : String) (config : FormatConfig := {}) : Except String (GenericFormat tz) := do
+def spec (input : String) (config : FormatConfig := {}) : Except String (Format tz) := do
   let string ← specParser.run input
   return ⟨config, string⟩
 
 /--
-Builds a `GenericFormat` from the input string. If parsing fails, it will panic
+Builds a `Format` from the input string. If parsing fails, it will panic
 -/
-def spec! (input : String) (config : FormatConfig := {}) : GenericFormat tz :=
+def spec! (input : String) (config : FormatConfig := {}) : Format tz :=
   match specParser.run input with
   | .ok res => ⟨config, res⟩
   | .error res => panic! res
 
 /--
-Formats a `DateTime` value into a string using the given `GenericFormat`.
+Type class for types that can be formatted as a `DateTime`.
 -/
-def format (format : GenericFormat aw) (date : DateTime tz) : String :=
+class FormattableTime (α : Type) where
+
+  /--
+  Converts a type `α` to a `DateTime` and a `TimeZone`.
+  -/
+  toDateTime : α → Σ tz, DateTime tz
+
+instance : FormattableTime (DateTime tz) where
+  toDateTime dt := ⟨tz, dt⟩
+
+instance : FormattableTime ZonedDateTime where
+  toDateTime dt := ⟨dt.timezone, dt.toDateTime⟩
+
+instance : FormattableTime (Awareness.any.type) where
+  toDateTime dt := ⟨dt.timezone, dt.toDateTime⟩
+
+instance : FormattableTime (Awareness.only tz |>.type) where
+  toDateTime dt := ⟨tz, by simp at dt; exact dt⟩
+/--
+Formats a `DateTime` value into a string using the given `Format`.
+-/
+def format [FormattableTime t] (format : Format aw) (date : t) : String :=
+  let ⟨_, date⟩ := FormattableTime.toDateTime date
+
   let mapper (part : FormatPart) :=
     match aw with
     | .any => formatPartWithDate date part
@@ -1447,8 +1294,8 @@ private def parser (format : FormatString) (config : FormatConfig) (aw : Awarene
     | x :: xs => parseWithDate builder config x >>= (go · xs)
     | [] =>
       match builder.build aw with
-      | some res => pure res
-      | none => fail "could not parse the date"
+      | .ok res => pure res
+      | .error msg => fail msg
   go {} format
 
 /--
@@ -1468,15 +1315,46 @@ def builderParser (format: FormatString) (config : FormatConfig) (func: FormatTy
   go format func
 
 /--
-Parses the input string into a `ZoneDateTime`.
+Returns `true` if this format contains a timezone-offset specifier (`O`, `X`, `x`, or `Z`).
 -/
-def parse (format : GenericFormat aw) (input : String) : Except String aw.type :=
+def hasOffsetSpecifier (format : Format aw) : Bool :=
+  format.string.any fun
+    | .modifier (.O _) | .modifier (.X _) | .modifier (.x _) | .modifier (.Z _) => true
+    | _ => false
+
+/--
+Returns `true` if this format contains a timezone-identifier specifier (`V` or `z`).
+-/
+def hasIdentifierSpecifier (format : Format aw) : Bool :=
+  format.string.any fun
+    | .modifier (.V _) | .modifier (.z _) | .modifier (.v _) => true
+    | _ => false
+
+/--
+Parses the input string without checking for identifier-without-offset.
+Use this only when you will subsequently resolve the identifier via a timezone database lookup.
+For normal parsing, prefer `parse`.
+-/
+def parseUnchecked (format : Format aw) (input : String) : Except String aw.type :=
   (parser format.string format.config aw <* eof).run input
+
+/--
+Parses the input string into a `ZonedDateTime`.
+Fails if the format contains a timezone identifier specifier (`z`/`V`) but no offset specifier
+(`Z`/`X`/`x`/`O`): such formats cannot produce a correct UTC offset without a timezone database
+lookup. Use `parseIO` (on `Format`) or `ZonedDateTime.parseIO` for that case.
+-/
+def parse (format : Format aw) (input : String) : Except String aw.type :=
+  if format.hasIdentifierSpecifier && !format.hasOffsetSpecifier then
+    .error "this format uses a timezone identifier without an offset specifier; \
+            the correct UTC offset requires a timezone database lookup — use parseIO instead"
+  else
+    (parser format.string format.config aw <* eof).run input
 
 /--
 Parses the input string into a `ZoneDateTime` and panics if its wrong.
 -/
-def parse! (format : GenericFormat aw) (input : String) : aw.type :=
+def parse! (format : Format aw) (input : String) : aw.type :=
   match parse format input with
   | .ok res => res
   | .error err => panic! err
@@ -1484,13 +1362,13 @@ def parse! (format : GenericFormat aw) (input : String) : aw.type :=
 /--
 Parses an input string using a builder function to produce a value.
 -/
-def parseBuilder (format : GenericFormat aw)  (builder : FormatType (Option α) format.string) (input : String) : Except String α :=
+def parseBuilder (format : Format aw)  (builder : FormatType (Option α) format.string) (input : String) : Except String α :=
   (builderParser format.string format.config builder).run input
 
 /--
 Parses an input string using a builder function, panicking on errors.
 -/
-def parseBuilder! [Inhabited α] (format : GenericFormat aw)  (builder : FormatType (Option α) format.string) (input : String) : α :=
+def parseBuilder! [Inhabited α] (format : Format aw)  (builder : FormatType (Option α) format.string) (input : String) : α :=
   match parseBuilder format builder input with
   | .ok res => res
   | .error err => panic! err
@@ -1498,7 +1376,7 @@ def parseBuilder! [Inhabited α] (format : GenericFormat aw)  (builder : FormatT
 /--
 Formats the date using the format into a String, using a `getInfo` function to get the information needed to build the `String`.
 -/
-def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Option (TypeFormat typ)) : Option String :=
+def formatGeneric (format : Format aw) (getInfo : (typ : Modifier) → Option (TypeFormat typ)) : Option String :=
   let rec go (data : String) : (format : FormatString) → Option String
     | .modifier x :: xs => do go (data ++ formatWith x (← getInfo x)) xs
     | .string x :: xs => go (data ++ x) xs
@@ -1506,33 +1384,60 @@ def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Op
   go "" format.string
 
 /--
-Constructs a `FormatType` function to format a date into a string using a `GenericFormat`.
+Constructs a `FormatType` function to format a date into a string using a `Format`.
 -/
-def formatBuilder (format : GenericFormat aw) : FormatType String format.string :=
+def formatBuilder (format : Format aw) : FormatType String format.string :=
   let rec go (data : String) : (format : FormatString) → FormatType String format
     | .modifier x :: xs => fun res => go (data ++ formatWith x res) xs
     | .string x :: xs => go (data ++ x) xs
     | [] => data
   go "" format.string
 
-end GenericFormat
+end Format
 
 /--
-Typeclass for formatting and parsing values with the given format type.
+A `MultiFormat` holds a list of `Format` alternatives tried in order when parsing.
+Use it when a value can be represented in several equivalent formats.
 -/
-class Format (f : Type) (typ : Type → f → Type) where
+structure MultiFormat (awareness : Awareness) where
   /--
-  Converts a format `f` into a string.
+  The list of format alternatives, tried left-to-right.
   -/
-  format : (fmt : f) → typ String fmt
+  formats : { x : Array (Format awareness) // x.size > 0 }
+  deriving Repr
 
-  /--
-  Parses a string into a format using the provided format type `f`.
-  -/
-  parse : (fmt : f) → typ (Option α) fmt → String → Except String α
+instance : Inhabited (MultiFormat aw) where
+  default := ⟨⟨#[default], by simp⟩⟩
 
-instance : Format (GenericFormat aw) (FormatType · ·.string) where
-  format := GenericFormat.formatBuilder
-  parse := GenericFormat.parseBuilder
+namespace MultiFormat
 
+/--
+?
+-/
+def new (formats : Array (Format aw)) (proof : formats.size > 0 := by simp) : MultiFormat aw :=
+  ⟨⟨formats, proof⟩⟩
+
+/--
+Parses the input string by trying each format in order, returning the first success.
+-/
+def parse (mf : MultiFormat aw) (input : String) : Except String aw.type :=
+  mf.formats.val.foldl (init := .error s!"no format matched input: {input}")
+    fun acc fmt => acc <|> fmt.parse input
+
+/--
+Parses the input string without timezone awareness checks, trying each format in order.
+-/
+def parseUnchecked (mf : MultiFormat aw) (input : String) : Except String aw.type :=
+  mf.formats.val.foldl (init := .error s!"no format matched input: {input}")
+    fun acc fmt => acc <|> fmt.parseUnchecked input
+
+/--
+Formats a date using the first format in the list.
+-/
+def format (mf : MultiFormat aw) (date : DateTime tz) : String :=
+  let fmt := mf.formats.val[0]'(mf.formats.property)
+  fmt.format date
+
+end MultiFormat
 end Time
+end Std

@@ -306,14 +306,13 @@ def weekday (date : PlainDate) : Weekday :=
   .ofOrdinal (Bounded.LE.ofNatWrapping res (by decide))
 
 /--
-Determines the week of the month for the given `PlainDate`. The week of the month is calculated based
-on the day of the month and the weekday. Each week starts on Monday because the entire library is
-based on the Gregorian Calendar.
+Determines the week of the month for the given `PlainDate`, where week 1 begins on `firstDay`
+(default: Monday). Week 1 is the partial week containing the 1st of the month.
 -/
-def alignedWeekOfMonth (date : PlainDate) : Week.Ordinal.OfMonth :=
-  let weekday := date.withDaysClip 1 |>.weekday |>.toOrdinal |>.sub 1
-  let days := date.day |>.sub 1 |>.addBounds weekday
-  days |>.ediv 7 (by decide) |>.add 1
+def alignedWeekOfMonth (date : PlainDate) (firstDay : Weekday := .monday) : Week.Ordinal.OfMonth :=
+  let day1Ord := (date.withDaysClip 1).weekday.toOrdinal.val
+  let offset := (day1Ord - firstDay.toOrdinal.val + 7) % 7
+  Bounded.LE.ofNatWrapping ((date.day.val - 1 + offset) / 7 + 1) (by decide)
 
 /--
 Sets the date to the specified `desiredWeekday`. If the `desiredWeekday` is the same as the current weekday,
@@ -354,6 +353,28 @@ def weekOfYear (date : PlainDate) : Week.Ordinal :=
     let h₁ := Int.not_lt.mp h₁
     let w := w.truncateBottom h |>.truncateTop (Int.le_trans h₁ y.weeks.property.right)
     w
+
+/--
+Returns the week-based year for a given `PlainDate`.
+-/
+def weekBasedYear (date : PlainDate) : Year.Offset :=
+  let year := date.year
+  let doy  := date.dayOfYear
+  let dow  := date.weekday.toOrdinal.sub 1
+
+  if doy.val ≤ 3 then
+    if doy.val - dow.val < -2 then
+      year - 1
+    else
+      year
+  else if doy.val ≥ 363 then
+    let leap := if date.inLeapYear then 1 else 0
+    if (doy.val - 363 - leap) - dow.val ≥ 0 then
+      year + 1
+    else
+      year
+  else
+    year
 
 instance : HAdd PlainDate Day.Offset PlainDate where
   hAdd := addDays

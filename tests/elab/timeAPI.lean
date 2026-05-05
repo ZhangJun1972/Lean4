@@ -629,9 +629,9 @@ Std.Time.Weekday.friday
   println! repr date.weekOfYear
   println! repr date.weekOfMonth
 
-  println! date.toAmericanDateString
-  println! date.toLeanDateString
-  println! date.toSQLDateString
+  println! (date.format "MM-dd-uuuu")
+  println! (date.format "uuuu-MM-dd")
+  println! (date.format "uuuu-MM-dd")
 
   println! date.toDaysSinceUNIXEpoch
   println! date.toTimestampAssumingUTC
@@ -887,14 +887,14 @@ info: 1970-01-02T00:00:00.000000000Z
   println! DateTime.ofTimestamp 1708121234 .UTC
 
 /--
-info: 1970-01-02T00:00:00.000000000[UTC]
-1997-03-18T00:00:00.000000000[UTC]
-1997-03-18T00:00:00.000000000[UTC]
-1997-03-18T00:01:02.000000000[UTC]
-1997-03-18T00:01:02.000000000[UTC]
-1997-03-18T00:01:02.000000000[UTC]
-2024-02-16T22:07:14.000000000[UTC]
-2024-02-16T22:07:14.000000000[UTC]
+info: 1970-01-02T00:00:00.000000000[Z]
+1997-03-18T00:00:00.000000000[Z]
+1997-03-18T00:00:00.000000000[Z]
+1997-03-18T00:01:02.000000000[Z]
+1997-03-18T00:01:02.000000000[Z]
+1997-03-18T00:01:02.000000000[Z]
+2024-02-16T22:07:14.000000000[Z]
+2024-02-16T22:07:14.000000000[Z]
 -/
 #guard_msgs in
 #eval do

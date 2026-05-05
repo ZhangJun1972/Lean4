@@ -108,7 +108,7 @@ Calculates the number of days in the specified `year`.
 def days (year : Offset) : Bounded.LE 365 366 :=
   if year.isLeap
     then .ofNatWrapping 366 (by decide)
-    else .ofNatWrapping 355 (by decide)
+    else .ofNatWrapping 365 (by decide)
 
 /--
 Calculates the number of weeks in the specified `year`.

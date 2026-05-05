@@ -7,6 +7,7 @@ module
 
 prelude
 public import Std.Time.Notation.Spec
+public import Std.Time.Format.Modifier
 public import Std.Time.Format.Basic
 import all Std.Time.Format.Basic
 
@@ -23,136 +24,199 @@ set_option linter.all true
 The ISO 8601 format, used for representing date and time in a standardized
 format. The format follows the pattern `uuuu-MM-dd'T'HH:mm:ssXXX`.
 -/
-def iso8601 : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ssXXX")
-
+def iso8601 : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ssXXX")
 
 /--
 The americanDate format, which follows the pattern `MM-dd-uuuu`.
 -/
-def americanDate : GenericFormat .any := datespec("MM-dd-uuuu")
+def americanDate : Format Awareness.any := datespec("MM-dd-uuuu")
 
 /--
 The europeanDate format, which follows the pattern `dd-MM-uuuu`.
 -/
-def europeanDate : GenericFormat .any := datespec("dd-MM-uuuu")
+def europeanDate : Format Awareness.any := datespec("dd-MM-uuuu")
 
 /--
-The time12Hour format, which follows the pattern `hh:mm:ss aa` for representing time
+The time12Hour format, which follows the pattern `hh:mm:ss a` for representing time
 in a 12-hour clock format with an upper case AM/PM marker.
 -/
-def time12Hour : GenericFormat .any := datespec("hh:mm:ss aa")
+def time12Hour : Format Awareness.any := datespec("hh:mm:ss a")
 
 /--
 The Time24Hour format, which follows the pattern `HH:mm:ss` for representing time
 in a 24-hour clock format.
 -/
-def time24Hour : GenericFormat .any := datespec("HH:mm:ss")
+def time24Hour : Format Awareness.any := datespec("HH:mm:ss")
 
 /--
 The DateTimeZone24Hour format, which follows the pattern `uuuu-MM-dd:HH:mm:ss.SSSSSSSSS` for
 representing date, time, and time zone.
 -/
-def dateTime24Hour : GenericFormat (.only .GMT) := datespec("uuuu-MM-dd:HH:mm:ss.SSSSSSSSS")
+def dateTime24Hour : Format (.only .GMT) := datespec("uuuu-MM-dd:HH:mm:ss.SSSSSSSSS")
 
 /--
 The DateTimeWithZone format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZ`
 for representing date, time, and time zone.
 -/
-def dateTimeWithZone : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZ")
+def dateTimeWithZone : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZ")
 
 /--
 The leanTime24Hour format, which follows the pattern `HH:mm:ss.SSSSSSSSS` for representing time
 in a 24-hour clock format. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanTime24Hour : GenericFormat .any := datespec("HH:mm:ss.SSSSSSSSS")
+def leanTime24Hour : Format Awareness.any := datespec("HH:mm:ss.SSSSSSSSS")
 
 /--
 The leanTime24HourNoNanos format, which follows the pattern `HH:mm:ss` for representing time
 in a 24-hour clock format. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanTime24HourNoNanos : GenericFormat .any := datespec("HH:mm:ss")
+def leanTime24HourNoNanos : Format Awareness.any := datespec("HH:mm:ss")
 
 /--
 The leanDateTime24Hour format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS` for
 representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTime24Hour : GenericFormat (.only .GMT) := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS")
+def leanDateTime24Hour : Format (.only .GMT) := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS")
 
 /--
 The leanDateTime24HourNoNanos format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss` for
 representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTime24HourNoNanos : GenericFormat (.only .GMT) := datespec("uuuu-MM-dd'T'HH:mm:ss")
+def leanDateTime24HourNoNanos : Format (.only .GMT) := datespec("uuuu-MM-dd'T'HH:mm:ss")
 
 /--
 The leanDateTimeWithZone format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZZZ`
 for representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTimeWithZone : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZZZ")
+def leanDateTimeWithZone : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZZZ")
 
 /--
 The leanDateTimeWithZoneNoNanos format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ssZZZZZ`
 for representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTimeWithZoneNoNanos : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ssZZZZZ")
+def leanDateTimeWithZoneNoNanos : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ssZZZZZ")
 
 /--
 The leanDateTimeWithIdentifier format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss[z]`
 for representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTimeWithIdentifier : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss'['zzzz']'")
+def leanDateTimeWithIdentifier : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss'['VV']'")
 
 /--
 The leanDateTimeWithIdentifierAndNanos format, which follows the pattern `uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS'[z]'`
 for representing date, time, and time zone. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDateTimeWithIdentifierAndNanos : GenericFormat .any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS'['zzzz']'")
+def leanDateTimeWithIdentifierAndNanos : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSS'['VV']'")
+
+/--
+The leanDateTimeWithZoneAndName format, which follows the pattern
+`uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZZZ'['VV']'` for representing date, time, timezone offset,
+and timezone identifier. This is the canonical Lean format used in `repr` for named timezones.
+-/
+def leanDateTimeWithZoneAndName : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSZZZZZ'['VV']'")
+
+/--
+The leanDateTimeWithZoneAndNameNoNanos format, which follows the pattern
+`uuuu-MM-dd'T'HH:mm:ssZZZZZ'['zzzz']'` for representing date, time, timezone offset, and timezone
+identifier without nanoseconds.
+-/
+def leanDateTimeWithZoneAndNameNoNanos : Format Awareness.any := datespec("uuuu-MM-dd'T'HH:mm:ssZZZZZ'['VV']'")
 
 /--
 The Lean Date format, which follows the pattern `uuuu-MM-dd`. It uses the default value that can be parsed with the
 notation of dates.
 -/
-def leanDate : GenericFormat .any := datespec("uuuu-MM-dd")
+def leanDate : Format Awareness.any := datespec("uuuu-MM-dd")
 
 /--
 The SQLDate format, which follows the pattern `uuuu-MM-dd` and is commonly used
 in SQL databases to represent dates.
 -/
-def sqlDate : GenericFormat .any := datespec("uuuu-MM-dd")
+def sqlDate : Format Awareness.any := datespec("uuuu-MM-dd")
 
 /--
 The LongDateFormat, which follows the pattern `EEEE, MMMM d, uuuu HH:mm:ss` for
 representing a full date and time with the day of the week and month name.
 -/
-def longDateFormat : GenericFormat (.only .GMT) := datespec("EEEE, MMMM d, uuuu HH:mm:ss")
+def longDateFormat : Format (.only .GMT) := datespec("EEEE, MMMM d, uuuu HH:mm:ss")
 
 /--
 The AscTime format, which follows the pattern `EEE MMM d HH:mm:ss uuuu`. This format
 is often used in older systems for logging and time-stamping events.
 -/
-def ascTime : GenericFormat (.only .GMT) := datespec("EEE MMM d HH:mm:ss uuuu")
+def ascTime : Format (.only .GMT) := datespec("EEE MMM d HH:mm:ss uuuu")
 
 /--
 The RFC822 format, which follows the pattern `eee, dd MMM uuuu HH:mm:ss ZZZ`.
 This format is used in email headers and HTTP headers.
 -/
-def rfc822 : GenericFormat .any := datespec("eee, dd MMM uuuu HH:mm:ss ZZZ")
+def rfc822 : Format Awareness.any := datespec("eee, dd MMM uuuu HH:mm:ss ZZZ")
 
 /--
-The RFC850 format, which follows the pattern `eee, dd-MMM-YY HH:mm:ss ZZZ`.
+The RFC850 format, which follows the pattern `eee, dd-MMM-yy HH:mm:ss ZZZ`.
 This format is an older standard for representing date and time in headers.
 -/
-def rfc850 : GenericFormat .any := datespec("eee, dd-MM-uuuu HH:mm:ss ZZZ")
+def rfc850 : Format Awareness.any := datespec("eee, dd-MMM-yy HH:mm:ss ZZZ")
+
+/--
+A `MultiFormat` that parses `leanDateTimeWithZone` with or without nanoseconds.
+-/
+def leanDateTimeWithZoneAlt : MultiFormat Awareness.any :=
+  .new #[leanDateTimeWithZone, leanDateTimeWithZoneNoNanos]
+
+/--
+A `MultiFormat` that parses `leanDateTimeWithZoneAndName` with or without nanoseconds.
+-/
+def leanDateTimeWithZoneAndNameAlt : MultiFormat Awareness.any :=
+  .new #[leanDateTimeWithZoneAndName, leanDateTimeWithZoneAndNameNoNanos]
+
+/--
+A `MultiFormat` that parses `leanDateTime24Hour` with or without nanoseconds.
+-/
+def leanDateTime24HourAlt : MultiFormat (.only .GMT) :=
+  .new #[leanDateTime24Hour, leanDateTime24HourNoNanos]
+
+/--
+A `MultiFormat` that parses `leanTime24Hour` with or without nanoseconds.
+-/
+def leanTime24HourAlt : MultiFormat Awareness.any :=
+  .new #[leanTime24Hour, leanTime24HourNoNanos]
+
+/--
+A `MultiFormat` that parses `leanDateTimeWithIdentifier` with or without nanoseconds.
+-/
+def leanDateTimeWithIdentifierAlt : MultiFormat Awareness.any :=
+  .new #[leanDateTimeWithIdentifier, leanDateTimeWithIdentifierAndNanos]
 
 end Formats
+
+namespace Format
+
+/--
+Parses the input string, resolving any timezone identifier via the default timezone database.
+For formats with a timezone identifier specifier but no offset specifier (e.g.
+`uuuu-MM-dd'T'HH:mm:ss'['zzzz']'`), this performs a tzdb lookup to find the correct UTC offset.
+For all other formats this behaves identically to `parse`.
+-/
+def parseIO (format : Format Awareness.any) (input : String) : IO ZonedDateTime := do
+  if format.hasIdentifierSpecifier && !format.hasOffsetSpecifier then
+    match format.parseUnchecked input with
+    | .error err => throw <| IO.userError err
+    | .ok zdt =>
+      let rules ← Database.defaultGetZoneRules zdt.timezone.name
+      pure <| ZonedDateTime.ofPlainDateTime zdt.toPlainDateTime rules
+  else
+    IO.ofExcept (format.parse input)
+
+end Format
 
 namespace TimeZone
 
@@ -160,7 +224,7 @@ namespace TimeZone
 Parses a string into a `TimeZone` object. The input string must be in the format `"VV ZZZZZ"`.
 -/
 def fromTimeZone (input : String) : Except String TimeZone := do
-  let spec : GenericFormat .any := datespec("VV ZZZZZ")
+  let spec : Format Awareness.any := datespec("VV ZZZZZ")
   spec.parseBuilder (fun id off => some (TimeZone.mk off id (off.toIsoString true) false)) input
 
 namespace Offset
@@ -169,7 +233,7 @@ namespace Offset
 Parses a string representing an offset into an `Offset` object. The input string must follow the `"xxx"` format.
 -/
 def fromOffset (input : String) : Except String Offset := do
-  let spec : GenericFormat .any := datespec("xxx")
+  let spec : Format Awareness.any := datespec("xxx")
   spec.parseBuilder some input
 
 end Offset
@@ -181,22 +245,23 @@ namespace PlainDate
 Formats a `PlainDate` using a specific format.
 -/
 def format (date : PlainDate) (format : String) : String :=
-  let format : Except String (GenericFormat .any) := GenericFormat.spec format
+  let format : Except String (Format Awareness.any) := Format.spec format
   match format with
   | .error err => s!"error: {err}"
   | .ok res =>
     let res := res.formatGeneric fun
       | .G _ => some date.era
       | .y _ => some date.year
+      | .Y _ => some date.weekBasedYear
       | .u _ => some date.year
       | .D _ => some (Sigma.mk date.year.isLeap date.dayOfYear)
-      | .Qorq _ => some date.quarter
+      | .Q _ | .q _ => some date.quarter
       | .w _ => some date.weekOfYear
-      | .W _ => some date.alignedWeekOfMonth
-      | .MorL _ => some date.month
+      | .W _ => some (date.alignedWeekOfMonth .sunday)
+      | .M _ | .L _ => some date.month
       | .d _ => some date.day
       | .E _ => some date.weekday
-      | .eorc _ => some date.weekday
+      | .e _ | .c _ => some date.weekday
       | .F _ => some date.weekOfMonth
       | _ => none
     match res with
@@ -204,53 +269,20 @@ def format (date : PlainDate) (format : String) : String :=
     | none => "invalid time"
 
 /--
-Parses a date string in the American format (`MM-dd-uuuu`) and returns a `PlainDate`.
--/
-def fromAmericanDateString (input : String) : Except String PlainDate := do
-  Formats.americanDate.parseBuilder (fun m d y => PlainDate.ofYearMonthDay? y m d) input
-
-/--
-Converts a date in the American format (`MM-dd-uuuu`) into a `String`.
--/
-def toAmericanDateString (input : PlainDate) : String :=
-  Formats.americanDate.formatBuilder input.month input.day input.year
-
-/--
-Parses a date string in the SQL format (`uuuu-MM-dd`) and returns a `PlainDate`.
--/
-def fromSQLDateString (input : String) : Except String PlainDate := do
-  Formats.sqlDate.parseBuilder PlainDate.ofYearMonthDay? input
-
-/--
-Converts a date in the SQL format (`uuuu-MM-dd`) into a `String`.
--/
-def toSQLDateString (input : PlainDate) : String :=
-  Formats.sqlDate.formatBuilder input.year input.month input.day
-
-/--
-Parses a date string in the Lean format (`uuuu-MM-dd`) and returns a `PlainDate`.
--/
-def fromLeanDateString (input : String) : Except String PlainDate := do
-  Formats.leanDate.parseBuilder PlainDate.ofYearMonthDay? input
-
-/--
-Converts a date in the Lean format (`uuuu-MM-dd`) into a `String`.
--/
-def toLeanDateString (input : PlainDate) : String :=
-  Formats.leanDate.formatBuilder input.year input.month input.day
-
-/--
 Parses a `String` in the `AmericanDate` or `SQLDate` format and returns a `PlainDate`.
 -/
 def parse (input : String) : Except String PlainDate :=
-  fromAmericanDateString input
-  <|> fromSQLDateString input
+  Formats.americanDate.parseBuilder (fun m d y => PlainDate.ofYearMonthDay? y m d) input
+  <|> Formats.sqlDate.parseBuilder PlainDate.ofYearMonthDay? input
+
+def leanDateString (d : PlainDate) : String :=
+  Formats.leanDate.formatBuilder d.year d.month d.day
 
 instance : ToString PlainDate where
-  toString := toLeanDateString
+  toString := leanDateString
 
 instance : Repr PlainDate where
-  reprPrec data := Repr.addAppParen ("date(\"" ++ toLeanDateString data ++ "\")")
+  reprPrec d := Repr.addAppParen ("date(\"" ++ leanDateString d ++ "\")")
 
 end PlainDate
 
@@ -260,7 +292,7 @@ namespace PlainTime
 Formats a `PlainTime` using a specific format.
 -/
 def format (time : PlainTime) (format : String) : String :=
-  let format : Except String (GenericFormat .any) := GenericFormat.spec format
+  let format : Except String (Format Awareness.any) := Format.spec format
   match format with
   | .error err => s!"error: {err}"
   | .ok res =>
@@ -271,6 +303,28 @@ def format (time : PlainTime) (format : String) : String :=
       | .n _ => some time.nanosecond
       | .s _ => some time.second
       | .a _ => some (HourMarker.ofOrdinal time.hour)
+      | .b _ =>
+        let h := time.hour.val
+        let m := time.minute.val
+        let s := time.second.val
+        let n := time.nanosecond.val
+        some <|
+          if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+          else if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+          else if h < 12 then .am
+          else .pm
+      | .B _ =>
+        let h := time.hour.val
+        let m := time.minute.val
+        let s := time.second.val
+        let n := time.nanosecond.val
+        some <|
+          if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+          else if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+          else if h < 6 ∨ h ≥ 21 then .night
+          else if h < 12 then .morning
+          else if h < 18 then .afternoon
+          else .evening
       | .h _ => some time.hour.toRelative
       | .K _ => some (time.hour.emod 12 (by decide))
       | .S _ => some time.nanosecond
@@ -282,58 +336,24 @@ def format (time : PlainTime) (format : String) : String :=
     | none => "invalid time"
 
 /--
-Parses a time string in the 24-hour format (`HH:mm:ss`) and returns a `PlainTime`.
--/
-def fromTime24Hour (input : String) : Except String PlainTime :=
-  Formats.time24Hour.parseBuilder (fun h m s => some (PlainTime.ofHourMinuteSeconds h m s)) input
-
-/--
-Formats a `PlainTime` value into a 24-hour format string (`HH:mm:ss`).
--/
-def toTime24Hour (input : PlainTime) : String :=
-  Formats.time24Hour.formatBuilder input.hour input.minute input.second
-
-/--
-Parses a time string in the lean 24-hour format (`HH:mm:ss.SSSSSSSSS` or `HH:mm:ss`) and returns a `PlainTime`.
--/
-def fromLeanTime24Hour (input : String) : Except String PlainTime :=
-  Formats.leanTime24Hour.parseBuilder (fun h m s n => some <| PlainTime.ofHourMinuteSecondsNano h m s n) input
-  <|> Formats.leanTime24HourNoNanos.parseBuilder (fun h m s => some <| PlainTime.ofHourMinuteSecondsNano h m s 0) input
-
-/--
-Formats a `PlainTime` value into a 24-hour format string (`HH:mm:ss.SSSSSSSSS`).
--/
-def toLeanTime24Hour (input : PlainTime) : String :=
-  Formats.leanTime24Hour.formatBuilder input.hour input.minute input.second input.nanosecond
-
-/--
-Parses a time string in the 12-hour format (`hh:mm:ss aa`) and returns a `PlainTime`.
--/
-def fromTime12Hour (input : String) : Except String PlainTime := do
-  let builder h m s a : Option PlainTime := do
-    let value ← Internal.Bounded.ofInt? h.val
-    some <| PlainTime.ofHourMinuteSeconds (HourMarker.toAbsolute a value) m s
-
-  Formats.time12Hour.parseBuilder builder input
-
-/--
-Formats a `PlainTime` value into a 12-hour format string (`hh:mm:ss aa`).
--/
-def toTime12Hour (input : PlainTime) : String :=
-  Formats.time12Hour.formatBuilder (input.hour.emod 12 (by decide) |>.add 1) input.minute input.second (if input.hour.val ≥ 12 then HourMarker.pm else HourMarker.am)
-
-/--
-Parses a `String` in the `Time12Hour` or `Time24Hour` format and returns a `PlainTime`.
+Parses a `String` in the `Time12Hour`, `Time24Hour`, or lean time (with optional nanoseconds) format
+and returns a `PlainTime`.
 -/
 def parse (input : String) : Except String PlainTime :=
-  fromTime12Hour input
-  <|> fromTime24Hour input
+  Formats.time12Hour.parseBuilder (fun h m s a => do
+    let value ← Internal.Bounded.ofInt? h.val
+    some <| PlainTime.ofHourMinuteSeconds (HourMarker.toAbsolute a value) m s) input
+  <|> Formats.leanTime24Hour.parseBuilder (fun h m s n => some <| PlainTime.ofHourMinuteSecondsNano h m s n) input
+  <|> Formats.time24Hour.parseBuilder (fun h m s => some (PlainTime.ofHourMinuteSeconds h m s)) input
+
+def leanTimeString (t : PlainTime) : String :=
+  Formats.leanTime24Hour.formatBuilder t.hour t.minute t.second t.nanosecond
 
 instance : ToString PlainTime where
-  toString := toLeanTime24Hour
+  toString := leanTimeString
 
 instance : Repr PlainTime where
-  reprPrec data := Repr.addAppParen ("time(\"" ++ toLeanTime24Hour data ++ "\")")
+  reprPrec data := Repr.addAppParen ("time(\"" ++ leanTimeString data ++ "\")")
 
 end PlainTime
 
@@ -343,99 +363,60 @@ namespace ZonedDateTime
 Formats a `ZonedDateTime` using a specific format.
 -/
 def format (data: ZonedDateTime) (format : String) : String :=
-  let format : Except String (GenericFormat .any) := GenericFormat.spec format
+  let format : Except String (Format Awareness.any) := Format.spec format
   match format with
   | .error err => s!"error: {err}"
-  | .ok res => res.format data.toDateTime
+  | .ok res => res.format data
 
 /--
-Parses a `String` in the `ISO8601` format and returns a `ZonedDateTime`.
+Parses a `String` in common zoned date-time formats and returns a `ZonedDateTime`.
+This parser does not resolve timezone identifiers like `[Europe/Paris]`; use `parseIO` for that.
 -/
-def fromISO8601String (input : String) : Except String ZonedDateTime :=
-  Formats.iso8601.parse input
+-- Wraps Format.parse to fix type unification (Awareness.any.type vs ZonedDateTime).
+private def parseFormat (fmt : Format Awareness.any) (input : String) : Except String ZonedDateTime :=
+  fmt.parse input
 
-/--
-Formats a `ZonedDateTime` value into an ISO8601 string.
--/
-def toISO8601String (date : ZonedDateTime) : String :=
-  Formats.iso8601.format date.toDateTime
-
-/--
-Parses a `String` in the rfc822 format and returns a `ZonedDateTime`.
--/
-def fromRFC822String (input : String) : Except String ZonedDateTime :=
-  Formats.rfc822.parse input
-
-/--
-Formats a `ZonedDateTime` value into an RFC822 format string.
--/
-def toRFC822String (date : ZonedDateTime) : String :=
-  Formats.rfc822.format date.toDateTime
-
-/--
-Parses a `String` in the rfc850 format and returns a `ZonedDateTime`.
--/
-def fromRFC850String (input : String) : Except String ZonedDateTime :=
-  Formats.rfc850.parse input
-
-/--
-Formats a `ZonedDateTime` value into an RFC850 format string.
--/
-def toRFC850String (date : ZonedDateTime) : String :=
-  Formats.rfc850.format date.toDateTime
-
-/--
-Parses a `String` in the dateTimeWithZone format and returns a `ZonedDateTime` object in the GMT time zone.
--/
-def fromDateTimeWithZoneString (input : String) : Except String ZonedDateTime :=
-  Formats.dateTimeWithZone.parse input
-
-/--
-Formats a `ZonedDateTime` value into a simple date time with timezone string.
--/
-def toDateTimeWithZoneString (pdt : ZonedDateTime) : String :=
-  Formats.dateTimeWithZone.format pdt.toDateTime
-
-/--
-Parses a `String` in the lean date time format with timezone format and returns a `ZonedDateTime` object.
--/
-def fromLeanDateTimeWithZoneString (input : String) : Except String ZonedDateTime :=
-  Formats.leanDateTimeWithZone.parse input
-  <|> Formats.leanDateTimeWithZoneNoNanos.parse input
-
-/--
-Parses a `String` in the lean date time format with identifier and returns a `ZonedDateTime` object.
--/
-def fromLeanDateTimeWithIdentifierString (input : String) : Except String ZonedDateTime :=
-  Formats.leanDateTimeWithIdentifier.parse input
-  <|> Formats.leanDateTimeWithIdentifierAndNanos.parse input
-
-/--
-Formats a `DateTime` value into a simple date time with timezone string that can be parsed by the date% notation.
--/
-def toLeanDateTimeWithZoneString (zdt : ZonedDateTime) : String :=
-  Formats.leanDateTimeWithZone.formatBuilder zdt.year zdt.month zdt.day zdt.hour zdt.minute zdt.date.get.time.second zdt.nanosecond zdt.offset
-/--
-Formats a `DateTime` value into a simple date time with timezone string that can be parsed by the date% notation with the timezone identifier.
--/
-def toLeanDateTimeWithIdentifierString (zdt : ZonedDateTime) : String :=
-  Formats.leanDateTimeWithIdentifierAndNanos.formatBuilder zdt.year zdt.month zdt.day zdt.hour zdt.minute zdt.date.get.time.second zdt.nanosecond zdt.timezone.name
-
-/--
-Parses a `String` in the `ISO8601`, `RFC822` or `RFC850` format and returns a `ZonedDateTime`.
--/
 def parse (input : String) : Except String ZonedDateTime :=
-  fromISO8601String input
-  <|> fromRFC822String input
-  <|> fromRFC850String input
-  <|> fromDateTimeWithZoneString input
-  <|> fromLeanDateTimeWithIdentifierString input
+  parseFormat Formats.iso8601 input
+  <|> parseFormat Formats.rfc822 input
+  <|> parseFormat Formats.rfc850 input
+  <|> parseFormat Formats.leanDateTimeWithZone input
+  <|> parseFormat Formats.leanDateTimeWithZoneNoNanos input
+  <|> parseFormat Formats.leanDateTimeWithZoneAndName input
+  <|> parseFormat Formats.leanDateTimeWithZoneAndNameNoNanos input
+  <|> parseFormat Formats.dateTimeWithZone input
+  <|> parseFormat Formats.leanDateTimeWithIdentifier input
+  <|> parseFormat Formats.leanDateTimeWithIdentifierAndNanos input
+
+/--
+Parses a `String` in common zoned date-time formats.
+If the input uses a timezone identifier (for example, `[Europe/Paris]`), it resolves it using the default timezone database.
+-/
+def parseIO (input : String) : IO ZonedDateTime := do
+  match parse input with
+  | .ok zdt => pure zdt
+  | .error err =>
+    let identParse : Except String ZonedDateTime :=
+      Formats.leanDateTimeWithIdentifier.parseUnchecked input
+      <|> Formats.leanDateTimeWithIdentifierAndNanos.parseUnchecked input
+    match identParse with
+    | .ok zdt =>
+      let rules ← Database.defaultGetZoneRules zdt.timezone.name
+      pure <| ZonedDateTime.ofPlainDateTime zdt.toPlainDateTime rules
+    | .error _ => throw <| IO.userError err
 
 instance : ToString ZonedDateTime where
-  toString := toLeanDateTimeWithIdentifierString
+  toString data := Formats.leanDateTimeWithIdentifierAndNanos.format data
 
 instance : Repr ZonedDateTime where
-  reprPrec data := Repr.addAppParen ("zoned(\"" ++ toLeanDateTimeWithZoneString data ++ "\")")
+  reprPrec data :=
+    let name := data.timezone.name
+    let str :=
+      if name == data.timezone.offset.toIsoString true then
+        Formats.leanDateTimeWithZone.format data
+      else
+        Formats.leanDateTimeWithZoneAndName.format data
+    Repr.addAppParen ("zoned(\"" ++ str ++ "\")")
 
 end ZonedDateTime
 
@@ -445,22 +426,31 @@ namespace PlainDateTime
 Formats a `PlainDateTime` using a specific format.
 -/
 def format (date : PlainDateTime) (format : String) : String :=
-  let format : Except String (GenericFormat .any) := GenericFormat.spec format
+  let format : Except String (Format Awareness.any) := Format.spec format
   match format with
   | .error err => s!"error: {err}"
   | .ok res =>
     let res := res.formatGeneric fun
       | .G _ => some date.era
       | .y _ => some date.year
+      | .Y _ =>
+        let week := date.weekOfYear
+        some <|
+          if date.month.val = 1 ∧ week.val ≥ 52 then
+            date.year - 1
+          else if date.month.val = 12 ∧ week.val = 1 then
+            date.year + 1
+          else
+            date.year
       | .u _ => some date.year
       | .D _ => some (Sigma.mk date.year.isLeap date.dayOfYear)
-      | .Qorq _ => some date.quarter
+      | .Q _ | .q _ => some date.quarter
       | .w _ => some date.weekOfYear
-      | .W _ => some date.alignedWeekOfMonth
-      | .MorL _ => some date.month
+      | .W _ => some (date.date.alignedWeekOfMonth .sunday)
+      | .M _ | .L _ => some date.month
       | .d _ => some date.day
       | .E _ => some date.weekday
-      | .eorc _ => some date.weekday
+      | .e _ | .c _ => some date.weekday
       | .F _ => some date.weekOfMonth
       | .H _ => some date.hour
       | .k _ => some date.hour.shiftTo1BasedHour
@@ -468,6 +458,28 @@ def format (date : PlainDateTime) (format : String) : String :=
       | .n _ => some date.nanosecond
       | .s _ => some date.time.second
       | .a _ => some (HourMarker.ofOrdinal date.hour)
+      | .b _ =>
+        let h := date.hour.val
+        let m := date.minute.val
+        let s := date.time.second.val
+        let n := date.nanosecond.val
+        some <|
+          if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+          else if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+          else if h < 12 then .am
+          else .pm
+      | .B _ =>
+        let h := date.hour.val
+        let m := date.minute.val
+        let s := date.time.second.val
+        let n := date.nanosecond.val
+        some <|
+          if h = 0 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .midnight
+          else if h = 12 ∧ m = 0 ∧ s = 0 ∧ n = 0 then .noon
+          else if h < 6 ∨ h ≥ 21 then .night
+          else if h < 12 then .morning
+          else if h < 18 then .afternoon
+          else .evening
       | .h _ => some date.hour.toRelative
       | .K _ => some (date.hour.emod 12 (by decide))
       | .S _ => some date.nanosecond
@@ -479,71 +491,22 @@ def format (date : PlainDateTime) (format : String) : String :=
     | none => "invalid time"
 
 /--
-Parses a `String` in the `AscTime` format and returns a `PlainDateTime` object in the GMT time zone.
--/
-def fromAscTimeString (input : String) : Except String PlainDateTime :=
-  Formats.ascTime.parse input
-  |>.map DateTime.toPlainDateTime
-
-/--
-Formats a `PlainDateTime` value into an AscTime format string.
--/
-def toAscTimeString (pdt : PlainDateTime) : String :=
-  Formats.ascTime.format (DateTime.ofPlainDateTimeAssumingUTC pdt .UTC)
-
-/--
-Parses a `String` in the `LongDateFormat` and returns a `PlainDateTime` object in the GMT time zone.
--/
-def fromLongDateFormatString (input : String) : Except String PlainDateTime :=
-  Formats.longDateFormat.parse input
-  |>.map DateTime.toPlainDateTime
-
-/--
-Formats a `PlainDateTime` value into a LongDateFormat string.
--/
-def toLongDateFormatString (pdt : PlainDateTime) : String :=
-  Formats.longDateFormat.format (DateTime.ofPlainDateTimeAssumingUTC pdt .UTC)
-
-/--
-Parses a `String` in the `DateTime` format and returns a `PlainDateTime`.
--/
-def fromDateTimeString (input : String) : Except String PlainDateTime :=
-  Formats.dateTime24Hour.parse input
-  |>.map DateTime.toPlainDateTime
-
-/--
-Formats a `PlainDateTime` value into a `DateTime` format string.
--/
-def toDateTimeString (pdt : PlainDateTime) : String :=
-  Formats.dateTime24Hour.formatBuilder pdt.year pdt.month pdt.day pdt.hour pdt.minute pdt.time.second pdt.nanosecond
-
-/--
-Parses a `String` in the `DateTime` format and returns a `PlainDateTime`.
--/
-def fromLeanDateTimeString (input : String) : Except String PlainDateTime :=
-  (Formats.leanDateTime24Hour.parse input <|> Formats.leanDateTime24HourNoNanos.parse input)
-  |>.map DateTime.toPlainDateTime
-
-/--
-Formats a `PlainDateTime` value into a `DateTime` format string.
--/
-def toLeanDateTimeString (pdt : PlainDateTime) : String :=
-  Formats.leanDateTime24Hour.formatBuilder pdt.year pdt.month pdt.day pdt.hour pdt.minute pdt.time.second pdt.nanosecond
-
-/--
-Parses a `String` in the `AscTime` or `LongDate` format and returns a `PlainDateTime`.
+Parses a `String` in the `AscTime`, `LongDate`, `DateTime`, or `LeanDateTime` format and returns a `PlainDateTime`.
 -/
 def parse (date : String) : Except String PlainDateTime :=
-  fromAscTimeString date
-  <|> fromLongDateFormatString date
-  <|> fromDateTimeString date
-  <|> fromLeanDateTimeString date
+  (Formats.ascTime.parse date).map DateTime.toPlainDateTime
+  <|> (Formats.longDateFormat.parse date).map DateTime.toPlainDateTime
+  <|> (Formats.dateTime24Hour.parse date).map DateTime.toPlainDateTime
+  <|> (Formats.leanDateTime24HourAlt.parse date).map DateTime.toPlainDateTime
+
+def leanPlainDateTimeString (date : PlainDateTime) : String :=
+  Formats.leanDateTime24Hour.formatBuilder date.year date.month date.day date.hour date.minute date.time.second date.nanosecond
 
 instance : ToString PlainDateTime where
-  toString := toLeanDateTimeString
+  toString := leanPlainDateTimeString
 
 instance : Repr PlainDateTime where
-  reprPrec data := Repr.addAppParen ("datetime(\"" ++ toLeanDateTimeString data ++ "\")")
+  reprPrec data := Repr.addAppParen ("datetime(\"" ++ leanPlainDateTimeString data ++ "\")")
 
 end PlainDateTime
 
@@ -553,76 +516,22 @@ namespace DateTime
 Formats a `DateTime` using a specific format.
 -/
 def format (data: DateTime tz) (format : String) : String :=
-  let format : Except String (GenericFormat .any) := GenericFormat.spec format
+  let format : Except String (Format Awareness.any) := Format.spec format
   match format with
   | .error err => s!"error: {err}"
   | .ok res => res.format data
 
 /--
-Parses a `String` in the `AscTime` format and returns a `DateTime` object in the GMT time zone.
--/
-def fromAscTimeString (input : String) : Except String (DateTime .GMT) :=
-  Formats.ascTime.parse input
-
-/--
-Formats a `DateTime` value into an AscTime format string.
--/
-def toAscTimeString (datetime : DateTime .GMT) : String :=
-  Formats.ascTime.format datetime
-
-/--
-Parses a `String` in the `LongDateFormat` and returns a `DateTime` object in the GMT time zone.
--/
-def fromLongDateFormatString (input : String) : Except String (DateTime .GMT) :=
-  Formats.longDateFormat.parse input
-
-/--
-Formats a `DateTime` value into a LongDateFormat string.
--/
-def toLongDateFormatString (datetime : DateTime .GMT) : String :=
-  Formats.longDateFormat.format datetime
-
-/--
-Formats a `DateTime` value into an ISO8601 string.
--/
-def toISO8601String (date : DateTime tz) : String :=
-  Formats.iso8601.format date
-
-/--
-Formats a `DateTime` value into an RFC822 format string.
--/
-def toRFC822String (date : DateTime tz) : String :=
-  Formats.rfc822.format date
-
-/--
-Formats a `DateTime` value into an RFC850 format string.
--/
-def toRFC850String (date : DateTime tz) : String :=
-  Formats.rfc850.format date
-
-/--
-Formats a `DateTime` value into a `DateTimeWithZone` format string.
--/
-def toDateTimeWithZoneString (pdt : DateTime tz) : String :=
-  Formats.dateTimeWithZone.format pdt
-
-/--
-Formats a `DateTime` value into a `DateTimeWithZone` format string that can be parsed by `date%`.
--/
-def toLeanDateTimeWithZoneString (pdt : DateTime tz) : String :=
-  Formats.leanDateTimeWithZone.format pdt
-
-/--
 Parses a `String` in the `AscTime` or `LongDate` format and returns a `DateTime`.
 -/
 def parse (date : String) : Except String (DateTime .GMT) :=
-  fromAscTimeString date
-  <|> fromLongDateFormatString date
+  Formats.ascTime.parse date
+  <|> Formats.longDateFormat.parse date
 
 instance : Repr (DateTime tz) where
-  reprPrec data := Repr.addAppParen (toLeanDateTimeWithZoneString data)
+  reprPrec data := Repr.addAppParen (Formats.leanDateTimeWithZone.format data)
 
 instance : ToString (DateTime tz) where
-  toString := toLeanDateTimeWithZoneString
+  toString data := Formats.leanDateTimeWithZone.format data
 
 end DateTime

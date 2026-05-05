@@ -90,11 +90,11 @@ where
     messageMethod? msg <|> (do pending.get? (← messageId? msg))
 
 local instance : ToJson Std.Time.ZonedDateTime where
-  toJson dt := dt.toISO8601String
+  toJson dt := Std.Time.Formats.iso8601.format dt
 
 local instance : FromJson Std.Time.ZonedDateTime where
   fromJson?
-    | .str s => Std.Time.ZonedDateTime.fromISO8601String s
+    | .str s => Std.Time.Formats.iso8601.parse s
     | _ => throw "Expected string when converting JSON to Std.Time.ZonedDateTime"
 
 structure LogEntry where
