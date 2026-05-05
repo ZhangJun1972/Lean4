@@ -260,12 +260,6 @@ def bombEmoji := "💥️"
 def checkEmoji := "✅️"
 def crossEmoji := "❌️"
 
-/-- Convert a `TraceResult` to its emoji representation. -/
-def TraceResult.toEmoji : TraceResult → String
-  | .success => checkEmoji
-  | .failure => crossEmoji
-  | .error   => bombEmoji
-
 /-- Convert an `Except` result to a `TraceResult`.
 `Except.error` always maps to `.error`.
 For `Bool`, `.ok false` maps to `.failure`. For `Option`, `.ok none` maps to `.failure`. -/
@@ -301,8 +295,9 @@ then `Lean.withTraceNode'` can be used instead.
 If profiling is enabled, this will also log the runtime of `k`.
 
 The class `ExceptToTraceResult` is used to convert the result produced by `k` into a `TraceResult`
-(success/failure/error), which is stored in `TraceData.result?` and also used to select the
-emoji prefix (✅️/❌️/💥️). A typical invocation might be:
+(success/failure/error), which is stored in `TraceData.result?`. The rendering layer uses
+`TraceResult.toEmoji` to prepend the appropriate emoji (✅️/❌️/💥️) when displaying the trace.
+A typical invocation might be:
 ```lean4
 withTraceNode `isPosTrace
     (msg := fun _ => return m!"checking positivity") do
@@ -336,7 +331,6 @@ where
     let ref ← getRef
     let mut m ← try msg res catch _ => pure m!"<exception thrown while producing trace node message>"
     let result := res.toTraceResult
-    m := m!"{result.toEmoji} {m}"
     let mut data : TraceData := { cls, collapsed, tag, result? := some result }
     if trace.profiler.get opts then
       data := { data with startTime := start, stopTime := stop }
@@ -389,7 +383,8 @@ Similar to `withTraceNode`, but msg is constructed **before** executing `k`.
 This is important when debugging methods such as `isDefEq`, and we want to generate the message
 before `k` updates the metavariable assignment. The class `ExceptToTraceResult` is used to convert
 the result produced by `k` into a `TraceResult` (success/failure/error), which is stored in
-`TraceData.result?` and also used to select the emoji prefix (✅️/❌️/💥️).
+`TraceData.result?`. The rendering layer uses `TraceResult.toEmoji` to prepend the appropriate
+emoji (✅️/❌️/💥️) when displaying the trace.
 
 TODO: find better name for this function.
 -/
@@ -419,7 +414,7 @@ where
       modifyTraces (oldTraces ++ ·)
       return (← MonadExcept.ofExcept res)
     let result := res.toTraceResult
-    let mut msg := m!"{result.toEmoji} {msg}"
+    let mut msg := msg
     let mut data : TraceData := { cls, collapsed, tag, result? := some result }
     if trace.profiler.get opts then
       data := { data with startTime := start, stopTime := stop }
