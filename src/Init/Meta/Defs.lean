@@ -1787,16 +1787,27 @@ namespace Tactic
 
 /--
 Extracts the items from a tactic configuration,
-either a `Lean.Parser.Tactic.optConfig`, `Lean.Parser.Tactic.config`, or these wrapped in null nodes.
+either a `Lean.Parser.Term.optConfig`, `Lean.Parser.Tactic.optConfig`, `Lean.Parser.Tactic.config`,
+or these wrapped in null nodes.
+
+Note: the syntax items do not need to be `configItem` specifically.
+The `ConfigEval.withConfigItem` processor has the capability to deal with "generalized" config items.
 -/
 partial def getConfigItems (c : Syntax) : TSyntaxArray ``configItem :=
-  if c.isOfKind nullKind then
-    c.getArgs.flatMap getConfigItems
-  else
-    match c with
-    | `(optConfig| $items:configItem*) => items
-    | `(config| (config := $_)) => #[⟨c⟩] -- handled by mkConfigItemViews
-    | _ => #[]
+  go #[] c
+where
+  go (acc : TSyntaxArray ``configItem) (c : Syntax) : TSyntaxArray ``configItem :=
+    if c.isOfKind nullKind then
+      c.getArgs.foldl go acc
+    else if c.getNumArgs == 1 && (c.getArg 0).isOfKind nullKind then
+      -- It's an `optConfig`, or a generalized version of one.
+      (c.getArg 0).getArgs.foldl go acc
+    else if c.isMissing then
+      acc
+    else
+      -- All other cases will be handled by the `ConfigEval` system.
+      -- This includes the legacy `Lean.Parser.Tactic.config`
+      acc.push ⟨c⟩
 
 def mkOptConfig (items : TSyntaxArray ``configItem) : TSyntax ``optConfig :=
   ⟨Syntax.node1 .none ``optConfig (mkNullNode items)⟩
@@ -1808,3 +1819,9 @@ or these wrapped in null nodes (for example because the syntax is `(config)?`).
 -/
 def appendConfig (cfg cfg' : Syntax) : TSyntax ``optConfig :=
   mkOptConfig <| getConfigItems cfg ++ getConfigItems cfg'
+
+end Tactic
+
+end Parser
+
+end Lean

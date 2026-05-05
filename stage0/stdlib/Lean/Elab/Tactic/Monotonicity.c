@@ -808,7 +808,7 @@ _start:
 lean_object* v___x_7_; lean_object* v___x_8_; lean_object* v___x_9_; lean_object* v___x_10_; lean_object* v___x_11_; lean_object* v___x_12_; 
 v___x_7_ = ((lean_object*)(l___private_Init_While_0__Lean_Loop_forIn_loop___at___00Lean_Meta_Monotonicity_headBetaUnderLambda_spec__1___closed__2));
 v___x_8_ = lean_unsigned_to_nat(19u);
-v___x_9_ = lean_unsigned_to_nat(1913u);
+v___x_9_ = lean_unsigned_to_nat(1922u);
 v___x_10_ = ((lean_object*)(l___private_Init_While_0__Lean_Loop_forIn_loop___at___00Lean_Meta_Monotonicity_headBetaUnderLambda_spec__1___closed__1));
 v___x_11_ = ((lean_object*)(l___private_Init_While_0__Lean_Loop_forIn_loop___at___00Lean_Meta_Monotonicity_headBetaUnderLambda_spec__1___closed__0));
 v___x_12_ = l_mkPanicMessageWithDecl(v___x_11_, v___x_10_, v___x_9_, v___x_8_, v___x_7_);
@@ -8011,7 +8011,7 @@ _start:
 lean_object* v___x_2699_; lean_object* v___x_2700_; lean_object* v___x_2701_; lean_object* v___x_2702_; lean_object* v___x_2703_; lean_object* v___x_2704_; 
 v___x_2699_ = ((lean_object*)(l___private_Init_While_0__Lean_Loop_forIn_loop___at___00Lean_Meta_Monotonicity_headBetaUnderLambda_spec__1___closed__2));
 v___x_2700_ = lean_unsigned_to_nat(20u);
-v___x_2701_ = lean_unsigned_to_nat(1924u);
+v___x_2701_ = lean_unsigned_to_nat(1933u);
 v___x_2702_ = ((lean_object*)(l_Lean_Meta_Monotonicity_solveMonoStep___lam__1___closed__0));
 v___x_2703_ = ((lean_object*)(l___private_Init_While_0__Lean_Loop_forIn_loop___at___00Lean_Meta_Monotonicity_headBetaUnderLambda_spec__1___closed__0));
 v___x_2704_ = l_mkPanicMessageWithDecl(v___x_2703_, v___x_2702_, v___x_2701_, v___x_2700_, v___x_2699_);
