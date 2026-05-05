@@ -1,6 +1,6 @@
 // Lean compiler output
 // Module: Lean.Meta.Tactic.Symm
-// Imports: public import Lean.Meta.Reduce public import Lean.Meta.Tactic.Assert public import Lean.Meta.DiscrTree.Main import Lean.Meta.AppBuilder
+// Imports: public import Lean.Meta.Reduce public import Lean.Meta.Tactic.Replace public import Lean.Meta.DiscrTree.Main import Lean.Meta.AppBuilder
 #include <lean/lean.h>
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -117,7 +117,7 @@ uint8_t lean_usize_dec_eq(size_t, size_t);
 lean_object* l___private_Lean_Meta_Basic_0__Lean_Meta_withMVarContextImp(lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*);
 uint64_t l_Lean_instHashableMVarId_hash(lean_object*);
 lean_object* l_Lean_Expr_fvar___override(lean_object*);
-lean_object* l_Lean_MVarId_replace(lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*);
+lean_object* l_Lean_MVarId_replace(lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*, lean_object*);
 lean_object* l_Lean_MVarId_getType(lean_object*, lean_object*, lean_object*, lean_object*, lean_object*);
 lean_object* l_Lean_Expr_cleanupAnnotations(lean_object*);
 lean_object* l_Lean_MVarId_getTag(lean_object*, lean_object*, lean_object*, lean_object*, lean_object*);
@@ -6867,7 +6867,7 @@ v_a_2249_ = lean_ctor_get(v___x_2248_, 0);
 lean_inc(v_a_2249_);
 lean_dec_ref(v___x_2248_);
 v___x_2250_ = lean_box(0);
-v___x_2251_ = l_Lean_MVarId_replace(v_g_2241_, v_h_2240_, v_a_2249_, v___x_2250_, v_a_2242_, v_a_2243_, v_a_2244_, v_a_2245_);
+v___x_2251_ = l_Lean_MVarId_replace(v_g_2241_, v_h_2240_, v_a_2249_, v___x_2250_, v___x_2250_, v_a_2242_, v_a_2243_, v_a_2244_, v_a_2245_);
 if (lean_obj_tag(v___x_2251_) == 0)
 {
 lean_object* v_a_2252_; lean_object* v___x_2254_; uint8_t v_isShared_2255_; uint8_t v_isSharedCheck_2260_; 
@@ -8975,7 +8975,7 @@ return v_res_2946_;
 }
 }
 lean_object* runtime_initialize_Lean_Meta_Reduce(uint8_t builtin);
-lean_object* runtime_initialize_Lean_Meta_Tactic_Assert(uint8_t builtin);
+lean_object* runtime_initialize_Lean_Meta_Tactic_Replace(uint8_t builtin);
 lean_object* runtime_initialize_Lean_Meta_DiscrTree_Main(uint8_t builtin);
 lean_object* runtime_initialize_Lean_Meta_AppBuilder(uint8_t builtin);
 static bool _G_runtime_initialized = false;
@@ -8986,7 +8986,7 @@ _G_runtime_initialized = true;
 res = runtime_initialize_Lean_Meta_Reduce(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = runtime_initialize_Lean_Meta_Tactic_Assert(builtin);
+res = runtime_initialize_Lean_Meta_Tactic_Replace(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
 res = runtime_initialize_Lean_Meta_DiscrTree_Main(builtin);
@@ -9016,7 +9016,7 @@ _G_meta_initialized = true;
 return lean_io_result_mk_ok(lean_box(0));
 }
 lean_object* initialize_Lean_Meta_Reduce(uint8_t builtin);
-lean_object* initialize_Lean_Meta_Tactic_Assert(uint8_t builtin);
+lean_object* initialize_Lean_Meta_Tactic_Replace(uint8_t builtin);
 lean_object* initialize_Lean_Meta_DiscrTree_Main(uint8_t builtin);
 lean_object* initialize_Lean_Meta_AppBuilder(uint8_t builtin);
 static bool _G_initialized = false;
@@ -9027,7 +9027,7 @@ _G_initialized = true;
 res = initialize_Lean_Meta_Reduce(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
-res = initialize_Lean_Meta_Tactic_Assert(builtin);
+res = initialize_Lean_Meta_Tactic_Replace(builtin);
 if (lean_io_result_is_error(res)) return res;
 lean_dec_ref(res);
 res = initialize_Lean_Meta_DiscrTree_Main(builtin);
