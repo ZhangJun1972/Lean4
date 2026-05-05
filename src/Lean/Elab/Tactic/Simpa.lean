@@ -21,6 +21,27 @@ register_option linter.unnecessarySimpa : Bool := {
   descr := "enable the 'unnecessary simpa' linter"
 }
 
+/--
+Controls the transparency used for the final unification in `simpa using h`.
+
+When `true` (the default), the simplified `h` must match the simplified goal at
+**reducible** transparency. This makes `simpa using h` more predictable: it no
+longer succeeds via incidental β/δ-reduction, so adding new `simp` lemmas is
+less likely to silently break unrelated `simpa` calls.
+
+Set to `false` to restore the previous behaviour, where the match was checked
+at the ambient (default/semireducible) transparency.
+
+This option only affects the final `isDefEq` check of `simpa using h`. The
+`simp` calls themselves, elaboration of the `using` term, and the
+metavariable-assignment's internal type check are unaffected.
+-/
+register_builtin_option backward.simpa.using.reducibleClose : Bool := {
+  defValue := true
+  descr    := "if true (the default), `simpa using h` requires the simplified \
+  `h` and goal to match at reducible transparency"
+}
+
 namespace Lean.Elab.Tactic.Simpa
 
 open Lean Parser.Tactic Elab Meta Term Tactic Simp Linter
@@ -79,7 +100,10 @@ def getLinterUnnecessarySimpa (o : LinterOptions) : Bool :=
                 let h ← Term.elabTerm (mkIdent name) gType
                 Term.synthesizeSyntheticMVarsNoPostponing
                 let hType ← inferType h
-                unless (← withAssignableSyntheticOpaque <| isDefEq gType hType) do
+                let isCompatible : MetaM Bool :=
+                  withAssignableSyntheticOpaque <| isDefEq gType hType
+                let useReducible := backward.simpa.using.reducibleClose.get (← getOptions)
+                unless (← if useReducible then withReducible isCompatible else isCompatible) do
                   -- `e` still is valid in this new local context
                   Term.throwTypeMismatchError gType hType h
                     (header? := some m!"Type mismatch: After simplification, term{indentExpr e}\n")

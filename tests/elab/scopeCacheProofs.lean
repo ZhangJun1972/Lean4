@@ -301,6 +301,13 @@ Key rewind properties are stated as separate lemmas.
 -/
 namespace Proofs
 
+-- Several `simpa using h` calls below close their goal by unfolding the
+-- semireducible definitions `Imp.EntryOrdered` and `GensConsistent` (both
+-- abbreviations for `List.Pairwise …`). The new default of
+-- `backward.simpa.using.reducibleClose` would reject this; opt out for the
+-- whole namespace.
+set_option backward.simpa.using.reducibleClose false
+
 /-! ### Rewind helper lemmas
 
 These lemmas capture the essential properties of the `rewind` function needed
