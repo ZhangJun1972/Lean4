@@ -283,8 +283,13 @@ If `logExceptions` is true, then `errToSorry` is enabled.
 def EvalConfigItem.setConfig' {α : Type} (eval : EvalConfigItem α)
     (init : α) (cfg : Syntax)
     (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
-    (logExceptions : Bool := false) : CoreM α :=
-  runConfigElab (eval.setConfig init cfg onErr logExceptions) logExceptions
+    (logExceptions : Bool := false) : CoreM α := do
+  if cfg.getNumArgs == 0 || (cfg.getNumArgs == 1 && (cfg.getArg 0).getNumArgs == 0) then
+    -- These represent an empty null node or an `optConfig`-like syntax with no arguments.
+    -- Return without doing `runConfigElab`.
+    return init
+  else
+    runConfigElab (eval.setConfig init cfg onErr logExceptions) logExceptions
 
 /--
 Calls `EvalConfigItem.setConfigs'` from within `runConfigElab`.
@@ -293,7 +298,10 @@ If `logExceptions` is true, then `errToSorry` is enabled.
 def EvalConfigItem.setConfigs' {α : Type} (eval : EvalConfigItem α)
     (init : α) (cfgs : Array Syntax)
     (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
-    (logExceptions : Bool := false) : CoreM α :=
-  runConfigElab (eval.setConfigs init cfgs onErr logExceptions) logExceptions
+    (logExceptions : Bool := false) : CoreM α := do
+  if cfgs.isEmpty then
+    return init
+  else
+    runConfigElab (eval.setConfigs init cfgs onErr logExceptions) logExceptions
 
 end Lean.Elab.ConfigEval
