@@ -325,6 +325,9 @@ def identComponents (stx : Syntax) (nFields? : Option Nat := none) : List Syntax
   match stx with
   | ident si@(SourceInfo.original lead pos trail _) rawStr val _ => Id.run do
     let val := val.eraseMacroScopes
+    -- Early return if the name has at most one component
+    if val.getNumParts ≤ 1 then
+      return [.ident si rawStr val []]
     -- With original info, we assume that `rawStr` represents `val`.
     let nameComps := nameComps val nFields?
     let rawComps := splitNameLit rawStr
@@ -346,8 +349,11 @@ def identComponents (stx : Syntax) (nFields? : Option Nat := none) : List Syntax
           ident info ss id []
     -- if re-parsing failed, just give them all the same span
     nameComps.map fun n => ident si n.toString.toRawSubstring n []
-  | ident si _ val _ =>
+  | ident si rawStr val _ => Id.run do
     let val := val.eraseMacroScopes
+    -- Early return if the name has at most one component
+    if val.getNumParts ≤ 1 then
+      return [.ident si rawStr val []]
     /- With non-original info:
      - `rawStr` can take all kinds of forms so we only use `val`.
      - there is no source extent to offset, so we pass it as-is. -/

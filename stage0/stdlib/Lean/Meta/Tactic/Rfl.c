@@ -3839,8 +3839,8 @@ goto v___jp_1168_;
 else
 {
 lean_object* v___x_1263_; 
-lean_dec_ref(v_fn_1228_);
 lean_dec_ref(v_snd_1219_);
+lean_dec_ref(v_fn_1228_);
 lean_dec(v_decl_1143_);
 lean_dec(v___x_1142_);
 v___x_1263_ = l_Lean_throwError___at___00__private_Lean_Meta_Tactic_Rfl_0__Lean_Meta_Rfl_initFn_00___x40_Lean_Meta_Tactic_Rfl_914023288____hygCtx___hyg_2__spec__3___redArg(v___x_1227_, v___x_1162_, v___x_1167_, v___y_1146_, v___y_1147_);

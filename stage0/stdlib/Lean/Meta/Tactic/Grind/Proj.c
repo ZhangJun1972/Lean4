@@ -631,7 +631,7 @@ v_resetjp_206_:
 lean_object* v_self_209_; uint8_t v_heqProofs_210_; lean_object* v___y_212_; lean_object* v___y_213_; lean_object* v___y_214_; lean_object* v___y_215_; lean_object* v___y_216_; lean_object* v___y_217_; lean_object* v___y_218_; lean_object* v_parentNew_242_; lean_object* v___y_243_; lean_object* v___y_244_; lean_object* v___y_245_; lean_object* v___y_246_; lean_object* v___y_247_; lean_object* v___y_248_; lean_object* v___y_249_; lean_object* v___y_250_; lean_object* v___y_251_; lean_object* v___y_252_; lean_object* v_parentNew_263_; lean_object* v___y_264_; lean_object* v___y_265_; lean_object* v___y_266_; lean_object* v___y_267_; lean_object* v___y_268_; lean_object* v___y_269_; lean_object* v___y_270_; lean_object* v___y_271_; lean_object* v___y_272_; lean_object* v___y_273_; uint8_t v___x_286_; 
 v_self_209_ = lean_ctor_get(v_a_205_, 0);
 lean_inc_ref(v_self_209_);
-v_heqProofs_210_ = lean_ctor_get_uint8(v_a_205_, sizeof(void*)*11 + 4);
+v_heqProofs_210_ = lean_ctor_get_uint8(v_a_205_, sizeof(void*)*12 + 4);
 lean_dec(v_a_205_);
 v___x_286_ = l_Lean_Expr_isAppOf(v_self_209_, v_ctorName_182_);
 lean_dec(v_ctorName_182_);
