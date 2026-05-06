@@ -22,12 +22,18 @@ open Lean.Meta.SolveByElim (SolveByElimConfig mkAssumptionSet)
 
 /--
 Allow elaboration of `Config` arguments to tactics.
+
+Note: does not generate a `(config := ...)` option due to the fields in the `except`
+clause, which are all function-valued and have no `EvalExpr` instances.
 -/
 declare_config_elab elabConfig Lean.Meta.SolveByElim.SolveByElimConfig where
   except proc, suspend, discharge
 
 /--
 Allow elaboration of `ApplyRulesConfig` arguments to tactics.
+
+Note: does not generate a `(config := ...)` option due to the fields in the `except`
+clause, which are all function-valued and have no `EvalExpr` instances.
 -/
 declare_config_elab elabApplyRulesConfig Lean.Meta.SolveByElim.ApplyRulesConfig where
   except proc, suspend, discharge
