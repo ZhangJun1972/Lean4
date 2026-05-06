@@ -143,6 +143,7 @@ def ConfigItem.addConstInfoForPrevRoot (item : ConfigItem) (n : Name) : TermElab
     if (← getEnv).contains n then -- in case we are in Lean prelude
       addConstInfo item.prevRoot n
 
+variable {α : Type} {m : Type → Type} [Monad m] [MonadRef m] in
 mutual
 /--
 Interprets `cfg` as configuration item or list of configuration items.
@@ -156,50 +157,53 @@ will be interpreted. We're expecting an item that has one of the following forma
 
 The specification:
 - A null node is a list of configurations
-- A one-argument node wrapping a node is considered to be a wrapper like `optConfig` or `configItem`.
-- A node with at most two arguments starting with a "+"/"-" atom, and whose second
-  argument is an ident or atom or missing is a `posConfigItem`/`negConfigItem`
+- A one-argument node is considered to be a wrapper like `optConfig` or `configItem`.
+- A node with at two arguments starting with a "+"/"-" atom and whose second
+  argument is an ident or atom is a `posConfigItem`/`negConfigItem`
 - A node with at most five arguments starting with a "(" atom and whose second argument
-  is an ident or atom or missing is a `valConfigItem`. The fourth argument is the value,
+  is an ident or atom is a `valConfigItem`. The fourth argument is the value,
   and it is allowed to have arbitary syntax (it does not need to be a `Term`).
+- A bare atom is considered to be a `"+"` option.
 
 We trust that any atoms are valid as idents. The atom will be parsed using `String.toName`
 to form the name. (Small optimization: if the name doesn't contain `.`, we use `Name.mkSimple`
 to skip parsing. Atoms must not contain numerals or `«»` escapes.)
 
 On interpretation error, `onErr` is called with the current configuration object and the offending
-syntax item. It process the item itself or otherwise throw an error. We do not call `onErr`
-if `cfg` is `Syntax.missing`.
+syntax item. It may process the item itself or otherwise throw an error. We leave it to `onErr`
+to decide what to do for items containing `Syntax.missing`.
 -/
-@[specialize] partial def foldConfigM {m α} [Monad m] [MonadRef m] (init : α) (cfg : Syntax)
+@[specialize] partial def foldConfigM
+    (init : α) (cfg : Syntax)
     (k : α → ConfigItem → m α)
     (onErr : α → Syntax → m α) :
     m α := do
-  let doFail (_ : Unit) := withRef cfg do onErr init cfg
-  -- Matches ident/atom/missing. Trusts that atoms are valid as idents and converts to idents,
+  let doFail (_ : Unit) : m α := withRef cfg do onErr init cfg
+  let atomAsIdent (si : SourceInfo) (val : String) : Ident :=
+    let n := if val.contains '.' then String.toName val else Name.mkSimple val
+    ⟨.ident si val.toRawSubstring n []⟩
+  -- Matches ident/atom. Trusts that atoms are valid as idents and converts to idents,
   -- preserving the original source info.
   let getIdent? (stx : Syntax) : Option Ident :=
     match stx with
-    | .missing => some ⟨.missing⟩
     | .ident .. => some ⟨stx⟩
-    | .atom si val =>
-      let n := if val.contains '.' then String.toName val else Name.mkSimple val
-      some ⟨.ident si val.toRawSubstring n []⟩
+    | .atom si val => some <| atomAsIdent si val
     | _ => none
   let isPosNeg? (val : String) : Option Bool :=
     if val == "+" then some true
     else if val == "-" then some false
     else none
-  if cfg.isOfKind nullKind || cfg.getNumArgs == 1 then
+  if cfg.isOfKind nullKind then
     foldConfigsM init cfg.getArgs k onErr
+  else if cfg.getNumArgs == 1 then
+    foldConfigM init (cfg.getArg 0) k onErr
   else if cfg.getNumArgs ≥ 1 then
-    let arg0 := cfg.getArg 0
-    match arg0 with
-    | .atom _ val =>
+    match cfg.getArg 0 with
+    | arg@(.atom _ val) =>
       if let some b := isPosNeg? val then
-        if cfg.getNumArgs ≤ 2 then
+        if cfg.getNumArgs == 2 then
           if let some ident := getIdent? (cfg.getArg 1) then
-            let value := if b then mkCIdentFrom arg0 ``true else mkCIdentFrom arg0 ``false
+            let value := if b then mkCIdentFrom arg ``true else mkCIdentFrom arg ``false
             return ← k init { ref := cfg, option := ident, bool? := some b, value }
       else if val == "(" then
         if cfg.getNumArgs ≤ 5 then
@@ -208,15 +212,15 @@ if `cfg` is `Syntax.missing`.
             return ← k init { ref := cfg, option := ident, value := cfg.getArg 3 }
       doFail ()
     | _ => doFail ()
-  else if cfg.isMissing then
-    return init
+  else if let .atom si val := cfg then
+    k init { ref := cfg, option := atomAsIdent si val, bool? := true, value := mkCIdentFrom cfg ``true  }
   else
     doFail ()
 
 /--
 Like `foldConfigM` but takes an array of configurations or configuration items.
 -/
-@[specialize] partial def foldConfigsM {m α} [Monad m] [MonadRef m] (init : α) (cfgs : Array Syntax)
+@[specialize] partial def foldConfigsM (init : α) (cfgs : Array Syntax)
     (k : α → ConfigItem → m α)
     (onErr : α → Syntax → m α) :
     m α := do
@@ -241,6 +245,28 @@ def EvalConfigItem.trySet {α} (eval : EvalConfigItem α)
       throw ex
 
 /--
+Default `onErr` handler. If the `cfgItem` contains `.missing`, we assume an error has already been
+reported by the parser and return `cfg`. Otherwise, we throw an unsupported syntax exception.
+
+If `cfgType?` is present, then it adds completion info when the identifier is missing.
+-/
+def EvalConfigItem.defaultOnErr {α : Type} (cfg : α) (cfgItem : Syntax) (cfgType? : Option Expr := none) : TermElabM α := do
+  if let some cfgType := cfgType? then
+    if (← getInfoState).enabled then
+      -- Assumption: the configuration item might be malformed, but if the
+      -- first token is an atom and the second is missing, it is almost surely
+      -- `"(" ...`, `"+" ...`, or `"-" ...` and completion would be helpful.
+      if (cfgItem.getArg 0).isAtom && (cfgItem.getArg 1).isMissing then
+        -- This expression is used only for its inferred type in the completion system.
+        let expr : Expr := mkApp2 (.const ``id [1]) cfgType (.const `_cfg_dummy [])
+        let info := { elaborator := `ConfigEval, stx := cfgItem.getArg 0, lctx := {}, expectedType? := none, expr }
+        addCompletionInfo <| .dot info none
+  if cfgItem.hasMissing then
+    return cfg
+  else
+    throwUnsupportedSyntax
+
+/--
 Applies the configuration `cfg` to `init` using `eval.set`.
 If `logExceptions` is true, then catches and logs exceptions.
 
@@ -250,7 +276,7 @@ Note: this should be run from within `runConfigElab`.
 -/
 def EvalConfigItem.setConfig {α} (eval : EvalConfigItem α)
     (init : α) (cfg : Syntax)
-    (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
+    (onErr : α → Syntax → TermElabM α := defaultOnErr)
     (logExceptions : Bool := false) : TermElabM α :=
   foldConfigM init cfg (eval.trySet (logExceptions := logExceptions)) onErr
 
@@ -264,17 +290,16 @@ Note: this should be run from within `runConfigElab`.
 -/
 def EvalConfigItem.setConfigs {α} (eval : EvalConfigItem α)
     (init : α) (cfgs : Array Syntax)
-    (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
+    (onErr : α → Syntax → TermElabM α := defaultOnErr)
     (logExceptions : Bool := false) : TermElabM α :=
   foldConfigsM init cfgs (eval.trySet (logExceptions := logExceptions)) onErr
 
 /--
-Runs `mx` using a fresh meta and term state, and ensures the environment is not modified.
+Runs `mx` using a fresh meta and term state.
 This should be used around any configuration elaboration.
 -/
 def runConfigElab {α} (mx : TermElabM α) (errToSorry : Bool) : CoreM α :=
-  withoutModifyingEnv do
-    MetaM.run' <| TermElabM.run' (ctx := { errToSorry }) <| withSaveInfoContext mx
+  MetaM.run' <| TermElabM.run' (ctx := { errToSorry }) <| withSaveInfoContext mx
 
 /--
 Calls `EvalConfigItem.setConfig'` from within `runConfigElab`.
@@ -282,7 +307,7 @@ If `logExceptions` is true, then `errToSorry` is enabled.
 -/
 def EvalConfigItem.setConfig' {α : Type} (eval : EvalConfigItem α)
     (init : α) (cfg : Syntax)
-    (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
+    (onErr : α → Syntax → TermElabM α := defaultOnErr)
     (logExceptions : Bool := false) : CoreM α := do
   if cfg.getNumArgs == 0 || (cfg.getNumArgs == 1 && (cfg.getArg 0).getNumArgs == 0) then
     -- These represent an empty null node or an `optConfig`-like syntax with no arguments.
@@ -297,7 +322,7 @@ If `logExceptions` is true, then `errToSorry` is enabled.
 -/
 def EvalConfigItem.setConfigs' {α : Type} (eval : EvalConfigItem α)
     (init : α) (cfgs : Array Syntax)
-    (onErr : α → Syntax → TermElabM α := fun _ _ => throwUnsupportedSyntax)
+    (onErr : α → Syntax → TermElabM α := defaultOnErr)
     (logExceptions : Bool := false) : CoreM α := do
   if cfgs.isEmpty then
     return init

@@ -182,7 +182,8 @@ macro (name := elabDeclareCoreConfigElab) doc?:(docComment)? vis?:(visibility)?
       $[$doc?:docComment]?
       $[$vis?:visibility]? def $elabName $[$binders]* ($cfg : Lean.Syntax) ($init : $type := {}) ($logExceptions : Bool := false) : CoreM $type := do
         let eval : EvalConfigItem $type := @$fnName $binderArgs*
-        eval.setConfig' $init $cfg (logExceptions := $logExceptions)
+        let onErr := EvalConfigItem.defaultOnErr (cfgType? := mkConst ``$type)
+        eval.setConfig' $init $cfg (onErr := onErr) (logExceptions := $logExceptions)
       end)
 
 open Linter.MissingDocs in
@@ -224,7 +225,8 @@ macro (name := elabDeclareTermConfigElab) doc?:(docComment)? vis?:(visibility)?
       $[$doc?:docComment]?
       $[$vis?:visibility]? def $elabName $[$binders]* ($cfg : Lean.Syntax) ($init : $type := {}) : TermElabM $type := do
         let eval : EvalConfigItem $type := @$fnName $binderArgs*
-        eval.setConfig' $init $cfg (logExceptions := (← read).errToSorry)
+        let onErr := EvalConfigItem.defaultOnErr (cfgType? := mkConst ``$type)
+        eval.setConfig' $init $cfg (onErr := onErr) (logExceptions := (← read).errToSorry)
       end)
 
 open Linter.MissingDocs in
@@ -267,7 +269,8 @@ macro (name := elabDeclareTacticConfig) doc?:(docComment)? vis?:(visibility)?
       $[$vis?:visibility]? def $elabName $[$binders]* ($cfg : Lean.Syntax) ($init : $type := {}) : $(mkCIdent ``Tactic.TacticM) $type := do
         let recover := (← read).recover
         let eval : EvalConfigItem $type := @$fnName $binderArgs*
-        Tactic.runTermElab <| eval.setConfig' $init $cfg (logExceptions := recover)
+        let onErr := EvalConfigItem.defaultOnErr (cfgType? := mkConst ``$type)
+        Tactic.runTermElab <| eval.setConfig' $init $cfg (onErr := onErr) (logExceptions := recover)
       end)
 
 open Linter.MissingDocs in
@@ -307,7 +310,8 @@ macro (name := elabDeclareCommandConfig) doc?:(docComment)? vis?:(visibility)?
       $[$doc?:docComment]?
       $[$vis?:visibility]? def $elabName $[$binders]* ($cfg : Lean.Syntax) ($init : $type := {}) ($logExceptions : Bool := true) : $(mkCIdent ``CommandElabM) $type := do
         let eval : EvalConfigItem $type := @$fnName $binderArgs*
-        Command.liftTermElabM <| eval.setConfig' $init $cfg (logExceptions := $logExceptions)
+        let onErr := EvalConfigItem.defaultOnErr (cfgType? := mkConst ``$type)
+        Command.liftTermElabM <| eval.setConfig' $init $cfg (onErr := onErr) (logExceptions := $logExceptions)
       end)
 
 open Linter.MissingDocs in

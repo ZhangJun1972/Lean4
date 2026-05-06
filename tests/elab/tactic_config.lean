@@ -374,3 +374,32 @@ derive_eval_expr_instance_using_meta_eval MetaEvalTest
   let stx ← `({ x := 3, b := true, f := (·+2) })
   let c ← evalExprWithElab (α := MetaEvalTest) stx
   logInfo m!"x: {c.x}, b: {c.b}, f 10: {c.f 10}, f 100: {c.f 100}"
+
+/-!
+Testing bare atoms for positive options
+-/
+structure TestBareConfig where
+  only : Bool := false
+  x : Nat := 0
+  deriving Repr
+syntax testBareConfigOnly := &"only"
+syntax testBareConfigCfg := many(testBareConfigOnly <|> Parser.Term.configItem)
+
+declare_command_config_elab elabTestBareConfig TestBareConfig
+
+elab "#test_bare_config" cfg:testBareConfigCfg : command => do
+  let config ← elabTestBareConfig cfg
+  logInfo m!"config is {repr config}"
+
+/-- info: config is { only := false, x := 0 } -/
+#guard_msgs in #test_bare_config
+/-- info: config is { only := true, x := 0 } -/
+#guard_msgs in #test_bare_config only
+/-- info: config is { only := true, x := 0 } -/
+#guard_msgs in #test_bare_config +only
+/-- info: config is { only := true, x := 0 } -/
+#guard_msgs in #test_bare_config (only := true)
+/-- info: config is { only := true, x := 2 } -/
+#guard_msgs in #test_bare_config (x := 2) only
+/-- info: config is { only := true, x := 2 } -/
+#guard_msgs in #test_bare_config only (x := 2)

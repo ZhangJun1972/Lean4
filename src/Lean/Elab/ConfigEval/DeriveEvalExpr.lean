@@ -105,7 +105,7 @@ where
   unless ← isDefEqGuarded (mkConst typeName) eType do
     throwError "Type mismatch. Option value{inlineExpr e}{← mkHasTypeButIsExpectedMsg eType (mkConst typeName)}"
   try
-    Meta.evalExpr' α typeName e (safety := .partial)
+    withoutModifyingEnv <| Meta.evalExpr' α typeName e (safety := .partial)
   catch ex =>
     throwError m!"Error evaluating{indentExpr e}\n\nException: {ex.toMessageData}"
 
