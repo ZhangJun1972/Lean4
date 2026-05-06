@@ -113,12 +113,9 @@ where
 Helper for deriving instances along with all dependencies.
 Given a one-parameter class `className` and a type `type`,
 uses pre-existing conditional instances to figure out which types would
-suffice to be implemented, then runs `mkCmd` on
-instances, and then runs `mkCmd` on each
-runs `mkCmd` on each type `type'`
+suffice to be implemented, then runs `mkCmd` on each type with fresh macro scopes.
 
-Uses `mkCmd` to construct instances. The results of these commands are
-evaluated all at once. In particular, the instances from within `mkCmd`.
+The resulting commands are all run at once, after all are generated.
 -/
 def withClassInstDeps (className : Name) (type : Expr)
     (extraDeps : Expr → TermElabM (Array Expr))
