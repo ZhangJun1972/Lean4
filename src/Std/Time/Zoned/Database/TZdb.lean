@@ -80,6 +80,9 @@ def readRulesFromDisk (path : System.FilePath) (id : String) : IO ZoneRules := d
 
 /--
 Parsed form of the `TZ` environment variable.
+
+The POSIX proleptic format (e.g. `TZ=EST5EDT,M3.2.0,M11.1.0`) is not supported;
+only file paths and timezone IDs backed by zoneinfo data are recognized.
 -/
 inductive TZSpec
 
@@ -92,7 +95,7 @@ inductive TZSpec
   A timezone ID such as `America/New_York`, looked up in the zoneinfo search paths.
   -/
   | zoneId (id : String)
-  deriving Repr, BEq
+deriving Repr, BEq
 
 /--
 Parses the value of the `TZ` environment variable. Returns `none` for empty or
