@@ -69,8 +69,8 @@ def ensureEvalExpr
         expectedType? := some (Expr.const $(quote ival.name) []))
 where
   getIndType (type : Expr) : TermElabM InductiveVal := withRef typeRef do
-    let some indTypeName := (← whnf type).constName?
-      | throwError "`{type}` is not an inductive type"
+    let some indTypeName := (← whnfR type).constName?
+      | throwError "`{type}` is not a constant"
     let .inductInfo ival ← getConstInfo indTypeName
       | throwError "`{.ofConstName indTypeName}` is not an inductive type"
     unless ival.levelParams.isEmpty && ival.numParams == 0 && ival.numIndices == 0 do

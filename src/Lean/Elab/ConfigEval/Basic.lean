@@ -138,6 +138,12 @@ def ConfigItem.throwInvalidOption {α} (item : ConfigItem) (structName? : Option
   let structMsg := if let some structName := structName? then m!" for `{.ofConstName structName}`" else m!""
   throwErrorAt item.option "Invalid configuration option{nameMsg}{structMsg}"
 
+def ConfigItem.throwCannotSetOption {α} (item : ConfigItem) (structName? : Option Name) : TermElabM α :=
+  let name := item.origOptionName
+  let nameMsg := if name.isAnonymous then m!"" else m!" `{name}`"
+  let structMsg := if let some structName := structName? then m!" for `{.ofConstName structName}`" else m!""
+  throwErrorAt item.option "Cannot set option{nameMsg}{structMsg} using configuration syntax."
+
 def ConfigItem.addConstInfoForPrevRoot (item : ConfigItem) (n : Name) : TermElabM Unit := do
   if (← getInfoState).enabled then
     if (← getEnv).contains n then -- in case we are in Lean prelude

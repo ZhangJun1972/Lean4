@@ -54,7 +54,10 @@ its fields.
 private partial def planDerivation (className : Name) (type : Expr)
     (extraDeps : Expr → TermElabM (Array Expr)) :
     TermElabM (Array Expr) := do
-  go #[] {type} type
+  withTraceNode `Elab.ConfigEval
+      (fun r => return m!"derivation plan `{.ofConstName className}` for `{type}`: "
+        ++ match r with | .ok types => m!"{types}" | .error ex => ex.toMessageData) do
+    go #[] {type} type
 where
   go (plan : Array Expr) (processing : ExprSet) (type : Expr) : TermElabM (Array Expr) := withIncRecDepth do
     trace[Elab.ConfigEval] "plan: {plan}, processing: {processing.toList}, type: {type}"
@@ -115,18 +118,24 @@ Given a one-parameter class `className` and a type `type`,
 uses pre-existing conditional instances to figure out which types would
 suffice to be implemented, then runs `mkCmd` on each type with fresh macro scopes.
 
-The resulting commands are all run at once, after all are generated.
+The commands are generated and elaborated one at a time.
 -/
 def withClassInstDeps (className : Name) (type : Expr)
     (extraDeps : Expr → TermElabM (Array Expr))
     (mkCmd : Expr → TermElabM Command) :
     CommandElabM Unit := do
-  let cmds ← liftTermElabM do
-    let types ← planDerivation className type extraDeps
-    trace[Elab.ConfigEval] m!"derivation plan for `{type}`: {types}"
-    types.mapM fun type' => withFreshMacroScope (mkCmd type')
-  unless cmds.isEmpty do
-    elabCommand (mkNullNode cmds)
+  let types ← liftTermElabM <| planDerivation className type extraDeps
+  let env ← getEnv
+  for type' in types do
+    let cmd ← liftTermElabM do
+      try
+        withFreshMacroScope (mkCmd type')
+      catch ex =>
+        trace[Elab.ConfigEval] m!"failure deriving instance for `{type'}`: {ex.toMessageData}"
+        setEnv env
+        throw ex
+    elabCommand cmd
+    trace[Elab.ConfigEval] m!"added instance of {.ofConstName className} for  `{type'}`"
 
 builtin_initialize
   registerTraceClass `Elab.ConfigEval

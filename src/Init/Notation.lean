@@ -746,7 +746,7 @@ This is the same as `#eval show MetaM Unit from discard do doSeq`.
 syntax (name := runMeta) "run_meta " doSeq : command
 
 /-- Configuration item for the `#reduce` command. -/
-syntax reduceOpts := many(atomic(" (" ident " := ") term ")")
+syntax reduceOpts := many(colGt atomic(" (" ident " := ") term ")")
 /--
 `#reduce <expression>` reduces the expression `<expression>` to its normal form. This
 involves applying reduction rules until no further reduction is possible.

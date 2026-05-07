@@ -42,7 +42,7 @@ structure EvalConfigItemHandler where
 structure EvalConfigItemView where
   /-- Fields to not automatically synthesize handlers for, in addition to those keys
   already appearing in `handlers`. -/
-  exceptFields : Array Name
+  exceptFields : Array (Ident × Name)
   /-- Explicitly provided handlers. -/
   handlers : Array EvalConfigItemHandler
 
@@ -78,9 +78,12 @@ private structure HandlerTrie where
 Finds a handler that applies to this key.
 Returns the trie key and the handler.
 
-Returns specifically handlers of a given `kind`.
+If `kind` is `exact` then it returns the handler that would actually apply,
+and if it is `wildcard` then it returns the wildcard handler corresponding to that
+key if an `exact` handler would also apply.
 -/
-private partial def HandlerTrie.find? (trie : HandlerTrie) (key : Name) (kind : EvalConfigItemHandlerKind) : Option (Name × EvalConfigItemHandler) := do
+private partial def HandlerTrie.find? (trie : HandlerTrie) (key : Name) (kind : EvalConfigItemHandlerKind) :
+    Option (Name × EvalConfigItemHandler) := do
   let root := key.getRoot
   if root.isAnonymous then
     match kind with
@@ -138,8 +141,25 @@ def addConstInfo' (ref : Syntax) (projFn : Name) : TermElabM Unit := do
     if (← getEnv).contains projFn then -- in case we are in Lean prelude
       addConstInfo ref projFn
 
+private structure State where
+  toDerive : NameMap ExprSet := {}
+  except : Array (Ident × Name)
+
 /-- Monad for collecting types that we should try deriving `EvalTerm` or `EvalExpr` instances for. -/
-private abbrev M := StateRefT (NameMap ExprSet) TermElabM
+private abbrev M := StateRefT State TermElabM
+
+private def addToDerive (cls : Name) (ty : Expr) : M Unit :=
+  modify fun s => { s with toDerive := s.toDerive.insert cls (s.toDerive.getD cls {} |>.insert ty) }
+
+private def hasExcept (key : Name) (projFn : Name) : M Bool := do
+  let s ← get
+  if let some idx := s.except.findIdx? (fun (_, name) => name == key) then
+    let (ref, _) := s.except[idx]!
+    addConstInfo ref projFn
+    set { s with except := s.except.eraseIdx! idx }
+    return true
+  else
+    return false
 
 /--
 Makes an `EvalConfigItem` for the structure.
@@ -157,14 +177,16 @@ partial def defEvalConfigItem
     CommandElabM Unit := do
   let structName ← liftTermElabM <| realizeGlobalConstNoOverloadWithInfo struct
   -- Pass one: make the trie to collect the missing instances
-  let (_, tys) ← liftTermElabM <| mkTrie structName true |>.run {}
+  let (_, { except, toDerive }) ← liftTermElabM <| mkTrie structName true |>.run { except := view.exceptFields }
+  for (ref, name) in except do
+    logErrorAt ref m!"No such field `{name}` of `{.ofConstName structName}`"
   -- Now that we're back in CommandElabM, derive instances
-  for ty in tys.getD ``EvalTerm {} do
+  for ty in toDerive.getD ``EvalTerm {} do
     try
       ensureEvalTerm vis? kind tk struct ty
     catch ex =>
       trace[Elab.ConfigEval] "Deriving EvalTerm instance for `{ty}` failed: {ex.toMessageData}"
-  for ty in tys.getD ``EvalExpr {} do
+  for ty in toDerive.getD ``EvalExpr {} do
     try
       ensureEvalExpr vis? kind tk struct ty
     catch ex =>
@@ -179,7 +201,7 @@ where
       return true
     catch _ =>
       unless ty.hasFVar do
-        modify fun tys => tys.insert cls (tys.getD cls {} |>.insert ty)
+        addToDerive cls ty
       return false
   checkStruct (structName : Name) : MetaM Unit := do
     let env ← getEnv
@@ -189,52 +211,57 @@ where
       | throwErrorAt struct "`{.ofConstName structName}` is not a structure"
     unless val.levelParams.isEmpty && val.numIndices == 0 && val.numParams == 0 do
       throwErrorAt struct "`{.ofConstName structName}` must not have parameters, indices, or universe parameters"
-  visitStruct (trie : HandlerTrie) (keyPrefix : Name) (structName : Name) (firstPass : Bool) : M HandlerTrie := do
+  visitStruct (trie : HandlerTrie) (keyPrefix : Name) (structName : Name) (allowFailure : Bool) : M HandlerTrie := do
+    withTraceNode `Elab.ConfigEval (fun _ => return m!"adding handlers for fields of `{.ofConstName structName}` with prefix `{keyPrefix}`, allowFailure: {allowFailure}") do
     checkStruct structName
     let fields := getStructureFieldsFlattened (← getEnv) structName (includeSubobjectFields := false)
     withLocalDeclD `self (Expr.const structName []) fun self => do
       let mut trie := trie
       for field in fields do
         let key := keyPrefix ++ field
-        if view.exceptFields.contains key then
-          continue
-        let mut synthesizedHandler := false
         let proj ← mkProjection self field
         let some projFn := proj.getAppFn.constName? | panic! "(Internal error) Invalid projection {inlineExpr proj}"
+        if (← hasExcept key projFn) then
+          trace[Elab.ConfigEval] "key `{key}` was excluded, skipping"
+          continue
         let fieldTy ← inferType proj
+        let mut hasExact := (trie.find? key .exact).isSome
+        let hasWildcard := (trie.find? key .wildcard).isSome
+        trace[Elab.ConfigEval] m!"key `{key}` hasExact: {hasExact}, hasWildcard: {hasWildcard}"
+        let mut synthesizedHandler := false
         -- If there's no exact key for this field yet, synthesize a handler
-        if (trie.find? key .exact).isNone then
+        if !hasExact then
           let mut body ← `(pure { config with $(mkIdent key):ident := value })
           if ← withReducible <| isDefEq fieldTy (mkConst ``Bool) then
             trace[Elab.ConfigEval] "field `{.ofConstName projFn}`, using {.ofConstName ``evalBoolItem}"
-            synthesizedHandler := true
             body ← `(evalBoolItem item >>= fun value => $body:term)
             trie := trie.insert { ref := struct, key, kind := .exact, body, projFn? := projFn }
+            hasExact := true
+            synthesizedHandler := true
           else
             let hasEvalTerm ← hasInstance ``EvalTerm fieldTy
             let hasEvalExpr ← hasInstance ``EvalExpr fieldTy
             trace[Elab.ConfigEval] "field `{.ofConstName projFn}`, hasEvalTerm: {hasEvalTerm}, hasEvalExpr: {hasEvalExpr}"
+            hasExact := hasEvalTerm || hasEvalExpr
             synthesizedHandler := synthesizedHandler || hasEvalTerm || hasEvalExpr
-            let eval ←
+            let mkHandler (eval : Term) : M Term :=
+              `(item.checkNotBool >>= fun _ => $eval:term >>= fun value => $body)
+            body ←
               match hasEvalTerm, hasEvalExpr with
-              | true,  true  => `(evalTermOrExprWithElab ⟨item.value⟩)
-              | false, true  => `(evalExprWithElab ⟨item.value⟩)
-              | true,  false => `(evalTermWithRef ⟨item.value⟩)
-              | false, false => `(item.throwInvalidOption)
-            body ← `(item.checkNotBool >>= fun _ => $eval:term >>= fun value => $body)
+              | true,  true  => `(evalTermOrExprWithElab ⟨item.value⟩) >>= mkHandler
+              | false, true  => `(evalExprWithElab ⟨item.value⟩) >>= mkHandler
+              | true,  false => `(evalTermWithRef ⟨item.value⟩) >>= mkHandler
+              | false, false => `(item.throwCannotSetOption $(quote structName))
             trie := trie.insert { ref := struct, key, kind := .exact, body, projFn? := projFn }
-        -- If there's no wildcard key yet for this field yet, and if the type is a structure,
-        -- we synthesize handlers for that structure's fields under the current key.
-        if (trie.find? key .wildcard).isNone then
+        if !hasWildcard then
           if let some structName' := (← whnfR fieldTy).constName? then
             if ← try checkStruct structName'; pure true catch _ => pure false then
-              synthesizedHandler := true
-              trie ← visitStruct trie key structName' firstPass
-        unless firstPass || synthesizedHandler do
-          throwErrorAt struct (m!"Field `{field}` of type{inlineExpr fieldTy}is missing an `{.ofConstName ``EvalTerm}` or `{.ofConstName ``EvalExpr}` instance."
+              trie ← visitStruct trie key structName' (allowFailure || hasExact)
+        unless allowFailure || hasExact || hasWildcard || synthesizedHandler do
+          throwErrorAt struct (m!"Field `{key}` of type{inlineExpr fieldTy}is missing both `{.ofConstName ``EvalTerm}` and `{.ofConstName ``EvalExpr}` instances."
               ++ .note m!"The scoped `ensure_eval_term_instance` and `ensure_eval_expr_instance` commands in `Lean.Elab.ConfigEval` were not able to derive instances.")
       return trie
-  mkTrie (structName : Name) (firstPass : Bool) : M HandlerTrie := do
+  mkTrie (structName : Name) (allowFailure : Bool) : M HandlerTrie := do
     let mut trie : HandlerTrie := {}
     for handler in view.handlers do
       if handler.key.isAnonymous && handler.kind matches .exact then
@@ -244,8 +271,8 @@ where
       -- Update the handlers to apply them to `config` and `item`
       let body ← `(($handler.body : $struct → ConfigItem → TermElabM $struct) config item)
       trie := trie.insert { handler with body }
-    trie ← visitStruct trie .anonymous structName firstPass
-    unless view.exceptFields.contains `config || (trie.find? `config .exact).isSome do
+    trie ← visitStruct trie .anonymous structName allowFailure
+    unless (← hasExcept `config structName) || (trie.find? `config .exact).isSome do
       if ← hasInstance ``EvalExpr (mkConst structName) then
         -- Only use an `EvalExpr` instance; we don't have plans to support structure instance notation with `EvalTerm`.
         let cfgBody ← `(evalExprWithElab ⟨item.value⟩)
@@ -284,7 +311,7 @@ where
       body ← `(item.addConstInfoForPrevRoot $(quote projFn) >>= fun _ => $body)
     return body
   mkCmd (structName : Name) : TermElabM Command := do
-    let trie ← mkTrie structName false |>.run' {}
+    let trie ← mkTrie structName false |>.run' { except := view.exceptFields }
     let body ← assemble trie (← `(invalidOption ()))
     `($[$doc?:docComment]?
       $[$vis?:visibility]?

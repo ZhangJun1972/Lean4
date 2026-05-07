@@ -403,3 +403,38 @@ elab "#test_bare_config" cfg:testBareConfigCfg : command => do
 #guard_msgs in #test_bare_config (x := 2) only
 /-- info: config is { only := true, x := 2 } -/
 #guard_msgs in #test_bare_config only (x := 2)
+
+/-!
+Testing auto-derivations
+-/
+namespace AutoDeriveTest
+
+structure A where
+  n : Nat
+
+inductive B where
+  | ctor1
+  | ctor2 (a : Option A)
+
+structure C where
+  opt1 : List A
+  opt2 : Option (Array B)
+
+open scoped Lean.Elab.ConfigEval
+
+ensure_eval_term_expr_instances C
+
+/-- info: instEvalTermA -/
+#guard_msgs in #synth EvalTerm A
+/-- info: instEvalTermB -/
+#guard_msgs in #synth EvalTerm B
+/-- info: instEvalTermC -/
+#guard_msgs in #synth EvalTerm C
+/-- info: instEvalExprA -/
+#guard_msgs in #synth EvalExpr A
+/-- info: instEvalExprB -/
+#guard_msgs in #synth EvalExpr B
+/-- info: instEvalExprC -/
+#guard_msgs in #synth EvalExpr C
+
+end AutoDeriveTest

@@ -89,7 +89,7 @@ end
 
 meta def mkEvalConfigItemView (entries? : Option (TSyntax ``configEntries)) :
     CommandElabM EvalConfigItemView := do
-  let mut exceptFields : Array Name := #[]
+  let mut exceptFields : Array (Ident × Name) := #[]
   let mut handlers : Array EvalConfigItemHandler := #[]
   if let some entries := entries? then
     match entries with
@@ -97,7 +97,7 @@ meta def mkEvalConfigItemView (entries? : Option (TSyntax ``configEntries)) :
       for entry in entries do
         match entry with
         | `(configEntry| except $[$fields],*) =>
-          exceptFields := exceptFields ++ fields.map (·.getId.eraseMacroScopes)
+          exceptFields := exceptFields ++ fields.map fun f => (f, f.getId.eraseMacroScopes)
         | `(configEntry| option $key:configEntryHandlerKey := $body) =>
           let (optName, kind) ←
             match key with
