@@ -7,7 +7,7 @@ module
 
 prelude
 public import Std.Time.Zoned
-public import Std.Time.Format.Locale
+public import Std.Time.Format.DateFormat
 import Init.Data.String.TakeDrop
 import Init.Data.String.Search
 
@@ -594,9 +594,9 @@ structure FormatConfig where
   /--
   Locale configuration for formatting and parsing, including locale-specific symbols and the first
   day of the week used for week-of-year and week-of-month calculations.
-  Default is `Locale.enUS` (English, US).
+  Default is `DateFormat.enUS` (English, US).
   -/
-  locale : Locale := Locale.enUS
+  dateformat : DateFormat := DateFormat.enUS
 
 deriving Inhabited
 
@@ -658,31 +658,31 @@ private def eraIndex : Year.Era → Fin 2
   | .bce => 0
   | .ce => 1
 
-private def formatMonthLong (symbols : LocaleSymbols) (month : Month.Ordinal) : String :=
+private def formatMonthLong (symbols : DateFormatSymbols) (month : Month.Ordinal) : String :=
   symbols.monthLong.get (month.sub 1 |>.toFin (by decide))
 
-private def formatMonthShort (symbols : LocaleSymbols) (month : Month.Ordinal) : String :=
+private def formatMonthShort (symbols : DateFormatSymbols) (month : Month.Ordinal) : String :=
   symbols.monthShort.get (month.sub 1 |>.toFin (by decide))
 
-private def formatMonthNarrow (symbols : LocaleSymbols) (month : Month.Ordinal) : String :=
+private def formatMonthNarrow (symbols : DateFormatSymbols) (month : Month.Ordinal) : String :=
   symbols.monthNarrow.get (month.sub 1 |>.toFin (by decide))
 
-private def formatWeekdayLong (symbols : LocaleSymbols) (wd : Weekday) : String :=
+private def formatWeekdayLong (symbols : DateFormatSymbols) (wd : Weekday) : String :=
   symbols.weekdayLong.get (wd.toOrdinal.sub 1 |>.toFin (by decide))
 
-private def formatWeekdayShort (symbols : LocaleSymbols) (wd : Weekday) : String :=
+private def formatWeekdayShort (symbols : DateFormatSymbols) (wd : Weekday) : String :=
   symbols.weekdayShort.get (wd.toOrdinal.sub 1 |>.toFin (by decide))
 
-private def formatWeekdayNarrow (symbols : LocaleSymbols) (wd : Weekday) : String :=
+private def formatWeekdayNarrow (symbols : DateFormatSymbols) (wd : Weekday) : String :=
   symbols.weekdayNarrow.get (wd.toOrdinal.sub 1 |>.toFin (by decide))
 
-private def formatEraShort (symbols : LocaleSymbols) (era : Year.Era) : String :=
+private def formatEraShort (symbols : DateFormatSymbols) (era : Year.Era) : String :=
   symbols.eraShort.get (eraIndex era)
 
-private def formatEraLong (symbols : LocaleSymbols) (era : Year.Era) : String :=
+private def formatEraLong (symbols : DateFormatSymbols) (era : Year.Era) : String :=
   symbols.eraLong.get (eraIndex era)
 
-private def formatEraNarrow (symbols : LocaleSymbols) (era : Year.Era) : String :=
+private def formatEraNarrow (symbols : DateFormatSymbols) (era : Year.Era) : String :=
   symbols.eraNarrow.get (eraIndex era)
 
 private def formatQuarterNumber : Month.Quarter → String
@@ -691,23 +691,23 @@ private def formatQuarterNumber : Month.Quarter → String
   | ⟨3, _⟩ => "3"
   | ⟨4, _⟩ => "4"
 
-private def formatQuarterShort (symbols : LocaleSymbols) (q : Month.Quarter) : String :=
+private def formatQuarterShort (symbols : DateFormatSymbols) (q : Month.Quarter) : String :=
   symbols.quarterShort.get (q.sub 1 |>.toFin (by decide))
 
-private def formatQuarterLong (symbols : LocaleSymbols) (q : Month.Quarter) : String :=
+private def formatQuarterLong (symbols : DateFormatSymbols) (q : Month.Quarter) : String :=
   symbols.quarterLong.get (q.sub 1 |>.toFin (by decide))
 
-private def formatMarkerShort (symbols : LocaleSymbols) (marker : HourMarker) : String :=
+private def formatMarkerShort (symbols : DateFormatSymbols) (marker : HourMarker) : String :=
   match marker with
   | .am => symbols.amShort
   | .pm => symbols.pmShort
 
-private def formatMarkerLong (symbols : LocaleSymbols) (marker : HourMarker) : String :=
+private def formatMarkerLong (symbols : DateFormatSymbols) (marker : HourMarker) : String :=
   match marker with
   | .am => symbols.amLong
   | .pm => symbols.pmLong
 
-private def formatMarkerNarrow (symbols : LocaleSymbols) (marker : HourMarker) : String :=
+private def formatMarkerNarrow (symbols : DateFormatSymbols) (marker : HourMarker) : String :=
   match marker with
   | .am => symbols.amNarrow
   | .pm => symbols.pmNarrow
@@ -760,13 +760,13 @@ def TypeFormat : Modifier → Type
   | .x _ => Offset
   | .Z _ => Offset
 
-private def formatWith (locale : Locale) (modifier : Modifier) (data : TypeFormat modifier) : String :=
+private def formatWith (dateformat : DateFormat) (modifier : Modifier) (data : TypeFormat modifier) : String :=
   match modifier with
   | .G format =>
     match format with
-    | .short => formatEraShort locale.symbols data
-    | .full => formatEraLong locale.symbols data
-    | .narrow => formatEraNarrow locale.symbols data
+    | .short => formatEraShort dateformat.symbols data
+    | .full => formatEraLong dateformat.symbols data
+    | .narrow => formatEraNarrow dateformat.symbols data
   | .y format =>
     let info := data.toInt
     let info := if info ≤ 0 then -info + 1 else info
@@ -794,16 +794,16 @@ private def formatWith (locale : Locale) (modifier : Modifier) (data : TypeForma
   | .MorL format =>
     match format with
     | .inl format => pad format.padding data.val
-    | .inr .short => formatMonthShort locale.symbols data
-    | .inr .full => formatMonthLong locale.symbols data
-    | .inr .narrow => formatMonthNarrow locale.symbols data
+    | .inr .short => formatMonthShort dateformat.symbols data
+    | .inr .full => formatMonthLong dateformat.symbols data
+    | .inr .narrow => formatMonthNarrow dateformat.symbols data
   | .d format =>
     pad format.padding data.val
   | .Qorq format =>
     match format with
     | .inl format => pad format.padding data.val
-    | .inr .short => formatQuarterShort locale.symbols data
-    | .inr .full => formatQuarterLong locale.symbols data
+    | .inr .short => formatQuarterShort dateformat.symbols data
+    | .inr .full => formatQuarterLong dateformat.symbols data
     | .inr .narrow => formatQuarterNumber data
   | .w format =>
     pad format.padding data.val
@@ -811,25 +811,25 @@ private def formatWith (locale : Locale) (modifier : Modifier) (data : TypeForma
     pad format.padding data.val
   | .E format =>
     match format with
-    | .short => formatWeekdayShort locale.symbols data
-    | .full => formatWeekdayLong locale.symbols data
-    | .narrow => formatWeekdayNarrow locale.symbols data
+    | .short => formatWeekdayShort dateformat.symbols data
+    | .full => formatWeekdayLong dateformat.symbols data
+    | .narrow => formatWeekdayNarrow dateformat.symbols data
   | .eorc format =>
     match format with
     | .inl format =>
-      let firstOrd : Int := locale.firstDayOfWeek.toOrdinal.val
+      let firstOrd : Int := dateformat.firstDayOfWeek.toOrdinal.val
       let dayOrd : Int := data.toOrdinal.val
       pad format.padding ((dayOrd - firstOrd + 7) % 7 + 1)
-    | .inr .short => formatWeekdayShort locale.symbols data
-    | .inr .full => formatWeekdayLong locale.symbols data
-    | .inr .narrow => formatWeekdayNarrow locale.symbols data
+    | .inr .short => formatWeekdayShort dateformat.symbols data
+    | .inr .full => formatWeekdayLong dateformat.symbols data
+    | .inr .narrow => formatWeekdayNarrow dateformat.symbols data
   | .F format =>
     pad format.padding data.val
   | .a format =>
     match format with
-    | .short => formatMarkerShort locale.symbols data
-    | .full => formatMarkerLong locale.symbols data
-    | .narrow => formatMarkerNarrow locale.symbols data
+    | .short => formatMarkerShort dateformat.symbols data
+    | .full => formatMarkerLong dateformat.symbols data
+    | .narrow => formatMarkerNarrow dateformat.symbols data
   | .h format => pad format.padding (data.val % 12)
   | .K format => pad format.padding (data.val % 12)
   | .k format => pad format.padding data.val
@@ -952,34 +952,34 @@ private def eraPairs (arr : Vector String 2) : Array (String × Year.Era) :=
 private def quarterPairs (arr : Vector String 4) : Array (String × Month.Quarter) :=
   arr.mapFinIdx (fun idx val n => (val, Bounded.LE.ofFin ⟨idx, n⟩ |>.add 1)) |>.toArray
 
-private def parseMonthLong (symbols : LocaleSymbols) : Parser Month.Ordinal :=
+private def parseMonthLong (symbols : DateFormatSymbols) : Parser Month.Ordinal :=
   parseFromSymbols (monthPairs symbols.monthLong)
 
 /--
 Parses a short month name using the given locale symbols and returns the corresponding `Month.Ordinal`.
 -/
-def parseMonthShort (symbols : LocaleSymbols) : Parser Month.Ordinal :=
+def parseMonthShort (symbols : DateFormatSymbols) : Parser Month.Ordinal :=
   parseFromSymbols (monthPairs symbols.monthShort)
 
-private def parseMonthNarrow (symbols : LocaleSymbols) : Parser Month.Ordinal :=
+private def parseMonthNarrow (symbols : DateFormatSymbols) : Parser Month.Ordinal :=
   parseFromSymbols (monthPairs symbols.monthNarrow)
 
-private def parseWeekdayLong (symbols : LocaleSymbols) : Parser Weekday :=
+private def parseWeekdayLong (symbols : DateFormatSymbols) : Parser Weekday :=
   parseFromSymbols (weekdayPairs symbols.weekdayLong)
 
-private def parseWeekdayShort (symbols : LocaleSymbols) : Parser Weekday :=
+private def parseWeekdayShort (symbols : DateFormatSymbols) : Parser Weekday :=
   parseFromSymbols (weekdayPairs symbols.weekdayShort)
 
-private def parseWeekdayNarrow (symbols : LocaleSymbols) : Parser Weekday :=
+private def parseWeekdayNarrow (symbols : DateFormatSymbols) : Parser Weekday :=
   parseFromSymbols (weekdayPairs symbols.weekdayNarrow)
 
-private def parseEraShort (symbols : LocaleSymbols) : Parser Year.Era :=
+private def parseEraShort (symbols : DateFormatSymbols) : Parser Year.Era :=
   parseFromSymbols (eraPairs symbols.eraShort)
 
-private def parseEraLong (symbols : LocaleSymbols) : Parser Year.Era :=
+private def parseEraLong (symbols : DateFormatSymbols) : Parser Year.Era :=
   parseFromSymbols (eraPairs symbols.eraLong)
 
-private def parseEraNarrow (symbols : LocaleSymbols) : Parser Year.Era :=
+private def parseEraNarrow (symbols : DateFormatSymbols) : Parser Year.Era :=
   parseFromSymbols (eraPairs symbols.eraNarrow)
 
 private def parseQuarterNumber : Parser Month.Quarter
@@ -988,19 +988,19 @@ private def parseQuarterNumber : Parser Month.Quarter
   <|> pstring "3" *> pure ⟨3, by decide⟩
   <|> pstring "4" *> pure ⟨4, by decide⟩
 
-private def parseQuarterLong (symbols : LocaleSymbols) : Parser Month.Quarter :=
+private def parseQuarterLong (symbols : DateFormatSymbols) : Parser Month.Quarter :=
   parseFromSymbols (quarterPairs symbols.quarterLong)
 
-private def parseQuarterShort (symbols : LocaleSymbols) : Parser Month.Quarter :=
+private def parseQuarterShort (symbols : DateFormatSymbols) : Parser Month.Quarter :=
   parseFromSymbols (quarterPairs symbols.quarterShort)
 
-private def parseMarkerShort (symbols : LocaleSymbols) : Parser HourMarker :=
+private def parseMarkerShort (symbols : DateFormatSymbols) : Parser HourMarker :=
   (pstring symbols.amShort *> pure .am) <|> (pstring symbols.pmShort *> pure .pm)
 
-private def parseMarkerLong (symbols : LocaleSymbols) : Parser HourMarker :=
+private def parseMarkerLong (symbols : DateFormatSymbols) : Parser HourMarker :=
   (pstring symbols.amLong *> pure .am) <|> (pstring symbols.pmLong *> pure .pm)
 
-private def parseMarkerNarrow (symbols : LocaleSymbols) : Parser HourMarker :=
+private def parseMarkerNarrow (symbols : DateFormatSymbols) : Parser HourMarker :=
   (pstring symbols.amNarrow *> pure .am) <|> (pstring symbols.pmNarrow *> pure .pm)
 
 private def exactly (parse : Parser α) (size : Nat) : Parser (Array α) :=
@@ -1094,9 +1094,9 @@ private def parseOffset (withMinutes : Reason) (withSeconds : Reason) (withColon
 private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (TypeFormat mod)
   | .G format =>
     match format with
-    | .short => parseEraShort config.locale.symbols
-    | .full => parseEraLong config.locale.symbols
-    | .narrow => parseEraNarrow config.locale.symbols
+    | .short => parseEraShort config.dateformat.symbols
+    | .full => parseEraLong config.dateformat.symbols
+    | .narrow => parseEraNarrow config.dateformat.symbols
   | .y format =>
     match format with
     | .any => Int.ofNat <$> parseAtLeastNum 1
@@ -1119,40 +1119,40 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
   | .MorL format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
-    | .inr .short => parseMonthShort config.locale.symbols
-    | .inr .full => parseMonthLong config.locale.symbols
-    | .inr .narrow => parseMonthNarrow config.locale.symbols
+    | .inr .short => parseMonthShort config.dateformat.symbols
+    | .inr .full => parseMonthLong config.dateformat.symbols
+    | .inr .narrow => parseMonthNarrow config.dateformat.symbols
   | .d format => parseNatToBounded (parseFlexibleNum format.padding)
   | .Qorq format =>
     match format with
     | .inl format => parseNatToBounded (parseFlexibleNum format.padding)
-    | .inr .short => parseQuarterShort config.locale.symbols
-    | .inr .full => parseQuarterLong config.locale.symbols
+    | .inr .short => parseQuarterShort config.dateformat.symbols
+    | .inr .full => parseQuarterLong config.dateformat.symbols
     | .inr .narrow => parseQuarterNumber
   | .w format => parseNatToBounded (parseFlexibleNum format.padding)
   | .W format => parseNatToBounded (parseFlexibleNum format.padding)
   | .E format =>
     match format with
-    | .short => parseWeekdayShort config.locale.symbols
-    | .full => parseWeekdayLong config.locale.symbols
-    | .narrow => parseWeekdayNarrow config.locale.symbols
+    | .short => parseWeekdayShort config.dateformat.symbols
+    | .full => parseWeekdayLong config.dateformat.symbols
+    | .narrow => parseWeekdayNarrow config.dateformat.symbols
   | .eorc format =>
     match format with
     | .inl format => do
       let n ← parseFlexibleNum format.padding
       if ¬ (1 ≤ n ∧ n ≤ 7) then fail "need a natural number in the interval of 1 to 7"
-      let firstOrd : Int := config.locale.firstDayOfWeek.toOrdinal.val
+      let firstOrd : Int := config.dateformat.firstDayOfWeek.toOrdinal.val
       let absOrd : Int := ((n : Int) - 1 + firstOrd - 1) % 7 + 1
       return Weekday.ofOrdinal (Bounded.LE.ofNatWrapping absOrd (by decide))
-    | .inr .short => parseWeekdayShort config.locale.symbols
-    | .inr .full => parseWeekdayLong config.locale.symbols
-    | .inr .narrow => parseWeekdayNarrow config.locale.symbols
+    | .inr .short => parseWeekdayShort config.dateformat.symbols
+    | .inr .full => parseWeekdayLong config.dateformat.symbols
+    | .inr .narrow => parseWeekdayNarrow config.dateformat.symbols
   | .F format => parseNatToBounded (parseFlexibleNum format.padding)
   | .a format =>
     match format with
-    | .short => parseMarkerShort config.locale.symbols
-    | .full => parseMarkerLong config.locale.symbols
-    | .narrow => parseMarkerNarrow config.locale.symbols
+    | .short => parseMarkerShort config.dateformat.symbols
+    | .full => parseMarkerLong config.dateformat.symbols
+    | .narrow => parseMarkerNarrow config.dateformat.symbols
   | .h format => parseNatToBounded (parseFlexibleNum format.padding)
   | .K format => parseNatToBounded (parseFlexibleNum format.padding)
   | .k format => parseNatToBounded (parseFlexibleNum format.padding)
@@ -1213,9 +1213,9 @@ private def parseWith (config : FormatConfig) : (mod : Modifier) → Parser (Typ
       (skipString "Z" *> pure Offset.zero)
       <|> (parseOffset .yes .optional true)
 
-private def formatPartWithDate (locale : Locale) (date : DateTime tz) (part : FormatPart) : String :=
+private def formatPartWithDate (dateformat : DateFormat) (date : DateTime tz) (part : FormatPart) : String :=
   match part with
-  | .modifier mod => formatWith locale mod (dateFromModifier locale.firstDayOfWeek date)
+  | .modifier mod => formatWith dateformat mod (dateFromModifier dateformat.firstDayOfWeek date)
   | .string s => s
 
 set_option linter.missingDocs false in  -- TODO
@@ -1383,11 +1383,11 @@ def spec! (input : String) (config : FormatConfig := {}) : GenericFormat tz :=
 Formats a `DateTime` value into a string using the given `GenericFormat`.
 -/
 def format (format : GenericFormat aw) (date : DateTime tz) : String :=
-  let locale := format.config.locale
+  let dateformat := format.config.dateformat
   let mapper (part : FormatPart) :=
     match aw with
-    | .any => formatPartWithDate locale date part
-    | .only tz => formatPartWithDate locale (date.convertTimeZone tz) part
+    | .any => formatPartWithDate dateformat date part
+    | .only tz => formatPartWithDate dateformat (date.convertTimeZone tz) part
 
   format.string.map mapper
   |> String.join
@@ -1450,9 +1450,9 @@ def parseBuilder! [Inhabited α] (format : GenericFormat aw)  (builder : FormatT
 Formats the date using the format into a String, using a `getInfo` function to get the information needed to build the `String`.
 -/
 def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Option (TypeFormat typ)) : Option String :=
-  let locale := format.config.locale
+  let dateformat := format.config.dateformat
   let rec go (data : String) : (format : FormatString) → Option String
-    | .modifier x :: xs => do go (data ++ formatWith locale x (← getInfo x)) xs
+    | .modifier x :: xs => do go (data ++ formatWith dateformat x (← getInfo x)) xs
     | .string x :: xs => go (data ++ x) xs
     | [] => some data
   go "" format.string
@@ -1461,9 +1461,9 @@ def formatGeneric (format : GenericFormat aw) (getInfo : (typ : Modifier) → Op
 Constructs a `FormatType` function to format a date into a string using a `GenericFormat`.
 -/
 def formatBuilder (format : GenericFormat aw) : FormatType String format.string :=
-  let locale := format.config.locale
+  let dateformat := format.config.dateformat
   let rec go (data : String) : (format : FormatString) → FormatType String format
-    | .modifier x :: xs => fun res => go (data ++ formatWith locale x res) xs
+    | .modifier x :: xs => fun res => go (data ++ formatWith dateformat x res) xs
     | .string x :: xs => go (data ++ x) xs
     | [] => data
   go "" format.string

@@ -17,11 +17,11 @@ namespace Time
 set_option linter.all true
 
 /--
-`LocaleSymbols` contains locale-specific strings needed for date/time formatting and parsing.
+`DateFormatSymbols` contains locale-specific strings needed for date/time formatting and parsing.
 
 Arrays are 0-indexed: `monthLong[0]` = January, `weekdayLong[0]` = Sunday, `eraShort[0]` = BCE.
 -/
-structure LocaleSymbols where
+structure DateFormatSymbols where
 
   /--
   Full month names (12 elements, index 0 = January).
@@ -113,12 +113,12 @@ structure LocaleSymbols where
   -/
   pmNarrow : String
 
-namespace LocaleSymbols
+namespace DateFormatSymbols
 
 /--
 English (US) locale symbols.
 -/
-def enUS : LocaleSymbols where
+def enUS : DateFormatSymbols where
   monthLong := Vector.mk #["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] (by decide)
   monthShort := Vector.mk #["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] (by decide)
   monthNarrow := Vector.mk #["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"] (by decide)
@@ -138,13 +138,13 @@ def enUS : LocaleSymbols where
   amNarrow := "A"
   pmNarrow := "P"
 
-end LocaleSymbols
+end DateFormatSymbols
 
 /--
-`Locale` contains locale-specific configuration for date/time formatting and parsing,
+`DateFormat` contains locale-specific configuration for date/time formatting and parsing,
 combining calendar conventions (e.g. first day of week) with locale symbols.
 -/
-structure Locale where
+structure DateFormat where
 
   /--
   The first day of the week for this locale (e.g., `Weekday.sunday` for US, `Weekday.monday` for ISO 8601).
@@ -154,18 +154,18 @@ structure Locale where
   /--
   Locale-specific symbols used for formatting and parsing text fields.
   -/
-  symbols : LocaleSymbols := LocaleSymbols.enUS
+  symbols : DateFormatSymbols := DateFormatSymbols.enUS
 
-namespace Locale
+namespace DateFormat
 
 /--
 English (US) locale.
 -/
-def enUS : Locale where
+def enUS : DateFormat where
   firstDayOfWeek := .sunday
-  symbols := LocaleSymbols.enUS
+  symbols := DateFormatSymbols.enUS
 
-end Locale
+end DateFormat
 
 end Time
 end Std
