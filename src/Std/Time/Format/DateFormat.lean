@@ -18,8 +18,6 @@ set_option linter.all true
 
 /--
 `DateFormatSymbols` contains locale-specific strings needed for date/time formatting and parsing.
-
-Arrays are 0-indexed: `monthLong[0]` = January, `weekdayLong[0]` = Sunday, `eraShort[0]` = BCE.
 -/
 structure DateFormatSymbols where
 
