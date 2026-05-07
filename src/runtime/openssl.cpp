@@ -4,9 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Sofia Rodrigues
 */
 #include "runtime/openssl.h"
+#include "runtime/io.h"
 
 #ifndef LEAN_EMSCRIPTEN
 #include <openssl/opensslv.h>
+#include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
