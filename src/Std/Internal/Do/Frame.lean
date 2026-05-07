@@ -6,7 +6,7 @@ Authors: Vladimir Gladshtein, Sebastian Graf
 module
 
 prelude
-public import Std.Internal.Do.Assertion
+public import Std.Internal.Do.Assertion.Assertion
 
 public section
 
