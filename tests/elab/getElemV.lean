@@ -559,7 +559,12 @@ theorem prefix_iff_getElemV [Nonempty α] {l₁ l₂ : List α} :
 theorem isEqv_eq_decide_getElemV {_ : Nonempty α} {as bs : List α} {r : α → α → Bool} :
     isEqv as bs r = if as.length = bs.length then
       decide (∀ (i : Nat), i < as.length → r as｢i｣ bs｢i｣) else false := by
-  -- Have to disable `Bool.if_false_right` because of spurious dependency
+  -- Have to disable `Bool.if_false_right` because of spurious dependency.
+  -- The `dite` in `isEqv_eq_decide`'s conclusion does not reduce to `ite` at
+  -- reducible transparency (`dite_eq_ite` requires the `fun _ => …` form
+  -- which simp cannot always normalize the hypothesis into), so we opt out
+  -- of the reducible-close behaviour here.
+  set_option backward.simpa.using.reducibleClose false in
   simpa [- Bool.if_false_right] using isEqv_eq_decide (as := as) (bs := bs) (r := r)
 
 theorem head_append_copy {l₁ l₂ : List α} (w : l₁ ++ l₂ ≠ []) :
