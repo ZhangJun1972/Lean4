@@ -6258,7 +6258,7 @@ lean_ctor_set_uint8(v_config_2015_, 16, v_zetaDelta_1954_);
 lean_ctor_set_uint8(v_config_2015_, 17, v_zetaUnused_1955_);
 lean_ctor_set_uint8(v_config_2015_, 18, v_zetaHave_1956_);
 v___x_2016_ = l_Lean_Meta_Context_configKey(v_a_1908_);
-v___x_2017_ = 2ULL;
+v___x_2017_ = 3ULL;
 v___x_2018_ = lean_uint64_shift_right(v___x_2016_, v___x_2017_);
 v___x_2019_ = lean_uint64_shift_left(v___x_2018_, v___x_2017_);
 v___x_2020_ = lean_uint64_once(&l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2, &l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2_once, _init_l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2);
@@ -6518,7 +6518,7 @@ v_reusejp_1991_:
 uint64_t v___x_1993_; uint64_t v___x_1994_; uint64_t v___x_1995_; uint64_t v___x_1996_; uint64_t v___x_1997_; uint64_t v_key_1998_; lean_object* v___x_1999_; lean_object* v___x_2000_; lean_object* v___x_2001_; 
 lean_ctor_set_uint8(v_config_1992_, 9, v___x_1990_);
 v___x_1993_ = l_Lean_Meta_Context_configKey(v_a_1908_);
-v___x_1994_ = 2ULL;
+v___x_1994_ = 3ULL;
 v___x_1995_ = lean_uint64_shift_right(v___x_1993_, v___x_1994_);
 v___x_1996_ = lean_uint64_shift_left(v___x_1995_, v___x_1994_);
 v___x_1997_ = lean_uint64_once(&l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2, &l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2_once, _init_l___private_Lean_Meta_Tactic_Grind_Proof_0__Lean_Meta_Grind_mkCongrProof___closed__2);
