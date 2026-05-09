@@ -147,12 +147,12 @@ structure DateFormat where
   /--
   The first day of the week for this locale (e.g., `Weekday.sunday` for US, `Weekday.monday` for ISO 8601).
   -/
-  firstDayOfWeek : Weekday := .sunday
+  firstDayOfWeek : Weekday
 
   /--
   Locale-specific symbols used for formatting and parsing text fields.
   -/
-  symbols : DateFormatSymbols := DateFormatSymbols.enUS
+  symbols : DateFormatSymbols
 
 namespace DateFormat
 
