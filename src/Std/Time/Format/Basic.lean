@@ -597,7 +597,6 @@ structure FormatConfig where
   Default is `DateFormat.enUS` (English, US).
   -/
   dateformat : DateFormat := DateFormat.enUS
-
 deriving Inhabited
 
 /--
@@ -613,7 +612,7 @@ structure GenericFormat (awareness : Awareness) where
   The format string used for parsing and formatting.
   -/
   string : FormatString
-  deriving Inhabited
+deriving Inhabited
 
 private def parseFormatPart : Parser FormatPart
   := (.modifier <$> parseModifier)
