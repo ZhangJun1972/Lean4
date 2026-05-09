@@ -23,14 +23,8 @@ Represents a Time Zone Database (TZdb) configuration with paths to local and gen
 structure TZdb where
 
   /--
-  The path to the local timezone file. This is typically a symlink to a file within the timezone
-  database that corresponds to the current local time zone.
-  -/
-  localPath : System.FilePath
-
-  /--
-  All the possible paths to the directories containing all available time zone files. These files define various
-  time zones and their rules.
+  Static fallback paths to directories containing time zone files. `TZDIR` is not stored here;
+  it is re-read on every lookup via `resolveZonesPaths`.
   -/
   zonesPaths : Array System.FilePath
 
@@ -143,32 +137,40 @@ def resolveLocalPath (zonesPaths : Array System.FilePath) : IO System.FilePath :
     throw <| IO.userError s!"TZ='{tz}': timezone not found in any zoneinfo directory"
 
 /--
-Returns a `TZdb` initialized from the `TZ` and `TZDIR` environment variables, with
-common fallback paths for Linux and macOS. Call this once at program startup.
+Returns a `TZdb` with common fallback zoneinfo paths for Linux and macOS.
+Call this once at program startup. The `TZ` and `TZDIR` environment variables
+are re-read on every `getLocalZoneRules`/`getZoneRules` call, so runtime changes
+to those variables are always reflected.
 -/
-def default : IO TZdb := do
-  let defs : Array System.FilePath := #["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo", "/usr/share/lib/zoneinfo"]
-
-  let zonesPaths ← match ← IO.getEnv "TZDIR" with
-    | none | some "" => pure defs
-    | some d =>
-      if ← System.FilePath.pathExists d then pure #[d]
-      else throw <| IO.userError s!"TZDIR='{d}': directory not found"
-
-  let localPath ← resolveLocalPath zonesPaths
-  return { localPath, zonesPaths }
+def default : IO TZdb :=
+  return { zonesPaths := #["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo", "/usr/share/lib/zoneinfo"] }
 
 /--
-Retrieves the timezone rules for the local timezone using `db.localPath`.
+Builds the effective zoneinfo search path by prepending the current `TZDIR` (if set and
+exists on disk) to `db.zonesPaths`. Called on every lookup so that runtime changes to
+`TZDIR` are reflected immediately.
 -/
-def getLocalZoneRules (db : TZdb) : IO ZoneRules :=
-  localRules db.localPath
+def resolveZonesPaths (db : TZdb) : IO (Array System.FilePath) := do
+  match ← IO.getEnv "TZDIR" with
+  | none | some "" => return db.zonesPaths
+  | some d =>
+    if ← System.FilePath.pathExists d then return (#[d] ++ db.zonesPaths)
+    else return db.zonesPaths
 
 /--
-Retrieves the timezone rules for the given timezone ID by searching `db.zonesPaths`.
+Retrieves the timezone rules for the local timezone, re-reading the `TZ` and `TZDIR`
+environment variables on each call so that runtime changes are reflected immediately.
+-/
+def getLocalZoneRules (db : TZdb) : IO ZoneRules := do
+  let path ← resolveLocalPath (← db.resolveZonesPaths)
+  localRules path
+
+/--
+Retrieves the timezone rules for the given timezone ID, re-reading `TZDIR` on each
+call so that runtime changes are reflected immediately.
 -/
 def getZoneRules (db : TZdb) (id : String) : IO ZoneRules := do
-  for base in db.zonesPaths do
+  for base in ← db.resolveZonesPaths do
     if ← (base.join id).pathExists then
       return ← readRulesFromDisk base id
 
