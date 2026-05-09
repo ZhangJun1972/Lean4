@@ -154,7 +154,7 @@ def resolveZonesPaths (db : TZdb) : IO (Array System.FilePath) := do
   match ← IO.getEnv "TZDIR" with
   | none | some "" => return db.zonesPaths
   | some d =>
-    if ← System.FilePath.pathExists d then return (#[d] ++ db.zonesPaths)
+    if ← System.FilePath.pathExists d then return (#[(d : System.FilePath)] ++ db.zonesPaths)
     else return db.zonesPaths
 
 /--
