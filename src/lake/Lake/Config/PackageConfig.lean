@@ -322,6 +322,34 @@ public configuration PackageConfig (p : Name) (n : Name) extends WorkspaceConfig
   allowImportAll : Bool := false
 
   /--
+  Whether this package is designed for use with the module system.
+
+  If enabled, Lake emits a warning whenever a module from another package
+  imports a module of this package without itself using the module system
+  (i.e., without a `module` header). This signals to downstream users that
+  the package's API expects the visibility and elaboration semantics of the
+  module system.
+
+  Downstream packages can opt out of the warning by setting
+  `silenceRequiresModuleSystemWarning := true` on their own package.
+
+  Defaults to `false`.
+  -/
+  requiresModuleSystem : Bool := false
+
+  /--
+  Whether to silence the warnings produced when this package imports modules
+  from a dependency that has set `requiresModuleSystem` while not using the
+  module system itself.
+
+  Use this to opt out of the migration nudge after deciding the package is
+  knowingly going to keep importing such dependencies without `module`.
+
+  Defaults to `false`.
+  -/
+  silenceRequiresModuleSystemWarning : Bool := false
+
+  /--
   Whether to run Lake's built-in linter on the package.
 
   * `true` — Always run built-in lints. When a lint driver is also configured,
