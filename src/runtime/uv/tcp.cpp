@@ -6,6 +6,11 @@ Author: Sofia Rodrigues
 
 #include "runtime/uv/tcp.h"
 #include <cstring>
+#ifndef LEAN_EMSCRIPTEN
+#ifndef LEAN_WINDOWS
+#include <poll.h>
+#endif
+#endif
 
 namespace lean {
 
@@ -200,6 +205,7 @@ extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_send(b_obj_arg socket, obj_arg d
         lean_dec(data_array);
         return lean_io_result_mk_error(decode_io_error(ENOMEM, nullptr));
     }
+
     uv_buf_t* bufs = (uv_buf_t*)malloc(array_len * sizeof(uv_buf_t));
     if (bufs == nullptr) {
         lean_dec(data_array);
@@ -744,6 +750,166 @@ extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_keepalive(b_obj_arg socket, int3
 
     return lean_io_result_mk_ok(lean_box(0));
 }
+
+/* Std.Internal.UV.TCP.Socket.hasPendingData (socket : @& Socket) : IO Bool */
+extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_has_pending_data(b_obj_arg socket) {
+#ifndef LEAN_WINDOWS
+    lean_uv_tcp_socket_object* tcp_socket = lean_to_uv_tcp_socket(socket);
+
+    event_loop_lock(&global_ev);
+
+    if (tcp_socket->m_promise_read != nullptr) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(UV_EALREADY, nullptr));
+    }
+
+    uv_os_fd_t fd;
+    int fileno_result = uv_fileno((uv_handle_t*)tcp_socket->m_uv_tcp, &fd);
+    if (fileno_result != 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(fileno_result, nullptr));
+    }
+
+    struct pollfd pfd;
+    pfd.fd = (int)fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    int result = poll(&pfd, 1, 0);
+    bool has_data = (result > 0) && (pfd.revents & POLLIN);
+
+    event_loop_unlock(&global_ev);
+
+    return lean_io_result_mk_ok(lean_box(has_data ? 1 : 0));
+#else
+    lean_uv_tcp_socket_object* tcp_socket = lean_to_uv_tcp_socket(socket);
+
+    event_loop_lock(&global_ev);
+
+    if (tcp_socket->m_promise_read != nullptr) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(UV_EALREADY, nullptr));
+    }
+
+    uv_os_fd_t fd;
+    int fileno_result = uv_fileno((uv_handle_t*)tcp_socket->m_uv_tcp, &fd);
+    if (fileno_result != 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(fileno_result, nullptr));
+    }
+
+    u_long bytes_available = 0;
+    if (ioctlsocket((SOCKET)fd, FIONREAD, &bytes_available) != 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_ok(lean_box(0));
+    }
+
+    event_loop_unlock(&global_ev);
+
+    return lean_io_result_mk_ok(lean_box(bytes_available > 0 ? 1 : 0));
+#endif
+}
+
+// Std.Internal.UV.TCP.Socket.tryRecv? (socket : @& Socket) (size : UInt64) : IO (Option (Except IO.Error (Option ByteArray)))
+extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_try_recv(b_obj_arg socket, uint64_t buffer_size) {
+#ifndef LEAN_WINDOWS
+    lean_uv_tcp_socket_object* tcp_socket = lean_to_uv_tcp_socket(socket);
+
+    event_loop_lock(&global_ev);
+
+    if (tcp_socket->m_promise_read != nullptr) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(UV_EALREADY, nullptr));
+    }
+
+    uv_os_fd_t fd;
+    int fileno_result = uv_fileno((uv_handle_t*)tcp_socket->m_uv_tcp, &fd);
+    if (fileno_result != 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_err(lean_decode_uv_error(fileno_result, nullptr))));
+    }
+
+    struct pollfd pfd;
+    pfd.fd = (int)fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    if (poll(&pfd, 1, 0) <= 0 || !(pfd.revents & POLLIN)) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_ok(lean::mk_option_none());
+    }
+
+    lean_object* byte_array = lean_alloc_sarray(1, 0, buffer_size);
+    ssize_t nread = recv((int)fd, (char*)lean_sarray_cptr(byte_array), (size_t)buffer_size, MSG_DONTWAIT);
+
+    event_loop_unlock(&global_ev);
+
+    if (nread > 0) {
+        lean_sarray_set_size(byte_array, (size_t)nread);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_ok(lean::mk_option_some(byte_array))));
+    } else if (nread == 0) {  /* EOF */
+        lean_dec(byte_array);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_ok(lean::mk_option_none())));
+    } else {
+        lean_dec(byte_array);
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return lean_io_result_mk_ok(lean::mk_option_none());
+        }
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_err(lean_decode_uv_error(uv_translate_sys_error(errno), nullptr))));
+    }
+#else
+    lean_uv_tcp_socket_object* tcp_socket = lean_to_uv_tcp_socket(socket);
+
+    event_loop_lock(&global_ev);
+
+    if (tcp_socket->m_promise_read != nullptr) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_error(lean_decode_uv_error(UV_EALREADY, nullptr));
+    }
+
+    uv_os_fd_t fd;
+    int fileno_result = uv_fileno((uv_handle_t*)tcp_socket->m_uv_tcp, &fd);
+    if (fileno_result != 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_err(lean_decode_uv_error(fileno_result, nullptr))));
+    }
+
+    u_long bytes_available = 0;
+    if (ioctlsocket((SOCKET)fd, FIONREAD, &bytes_available) != 0 || bytes_available == 0) {
+        event_loop_unlock(&global_ev);
+        return lean_io_result_mk_ok(lean::mk_option_none());
+    }
+
+    lean_object* byte_array = lean_alloc_sarray(1, 0, buffer_size);
+    int nread = recv((SOCKET)fd, (char*)lean_sarray_cptr(byte_array), (int)buffer_size, 0);
+
+    event_loop_unlock(&global_ev);
+
+    if (nread > 0) {
+        lean_sarray_set_size(byte_array, (size_t)nread);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_ok(lean::mk_option_some(byte_array))));
+    } else if (nread == 0) {
+        lean_dec(byte_array);
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_ok(lean::mk_option_none())));
+    } else {
+        lean_dec(byte_array);
+        int err = WSAGetLastError();
+        if (err == WSAEWOULDBLOCK) {
+            return lean_io_result_mk_ok(lean::mk_option_none());
+        }
+        return lean_io_result_mk_ok(
+            lean::mk_option_some(mk_except_err(
+                lean_decode_uv_error(uv_translate_sys_error(err), nullptr))));
+    }
+#endif
+}
+
 #else
 
 // =======================================
@@ -826,6 +992,18 @@ extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_nodelay(b_obj_arg socket) {
 }
 
 extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_keepalive(b_obj_arg socket, int32_t enable, uint32_t delay) {
+    lean_always_assert(
+        false && ("Please build a version of Lean4 with libuv to invoke this.")
+    );
+}
+
+extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_has_pending_data(b_obj_arg socket) {
+    lean_always_assert(
+        false && ("Please build a version of Lean4 with libuv to invoke this.")
+    );
+}
+
+extern "C" LEAN_EXPORT lean_obj_res lean_uv_tcp_try_recv(b_obj_arg socket, uint64_t buffer_size) {
     lean_always_assert(
         false && ("Please build a version of Lean4 with libuv to invoke this.")
     );
