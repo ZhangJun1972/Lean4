@@ -24,7 +24,7 @@
           stdenv = pkgs.overrideCC pkgs.stdenv llvmPackages.clang;
         } ({
           buildInputs = with pkgs; [
-            cmake gmp libuv ccache pkg-config
+            cmake gmp libuv ccache pkg-config openssl openssl.dev
             llvmPackages.bintools  # wrapped lld
             llvmPackages.llvm  # llvm-symbolizer for asan/lsan
             gdb
@@ -34,7 +34,21 @@
           hardeningDisable = [ "all" ];
           # more convenient `ctest` output
           CTEST_OUTPUT_ON_FAILURE = 1;
-        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux (let
+          # Build OpenSSL 3 statically using pkgsDist's old-glibc stdenv,
+          # so the resulting static libs don't require newer glibc symbols.
+          opensslForDist = pkgsDist.stdenv.mkDerivation {
+            name = "openssl-static-${pkgs.lib.getVersion pkgs.openssl.name}";
+            inherit (pkgs.openssl) src;
+            nativeBuildInputs = [ pkgsDist.perl ];
+            configurePhase = ''
+            patchShebangs .
+            ./config --prefix=$out no-shared no-tests
+          '';
+            buildPhase = "make -j$NIX_BUILD_CORES";
+            installPhase = "make install_sw";
+          };
+        in {
           GMP = (pkgsDist.gmp.override { withStatic = true; }).overrideAttrs (attrs:
             pkgs.lib.optionalAttrs (pkgs.stdenv.system == "aarch64-linux") {
               # would need additional linking setup on Linux aarch64, we don't use it anywhere else either
@@ -53,13 +67,15 @@
             };
             doCheck = false;
           });
+          OPENSSL = opensslForDist;
+          OPENSSL_DEV = opensslForDist;
           GLIBC = pkgsDist.glibc;
           GLIBC_DEV = pkgsDist.glibc.dev;
           GCC_LIB = pkgsDist.gcc.cc.lib;
           ZLIB = pkgsDist.zlib;
           # for CI coredumps
           GDB = pkgsDist.gdb;
-        });
+        }));
     in {
       devShells.${system} = {
         # The default development shell for working on lean itself
