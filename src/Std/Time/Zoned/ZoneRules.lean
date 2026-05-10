@@ -142,7 +142,7 @@ def createTimeZoneFromTransition (transition : Transition) : TimeZone :=
 Applies the transition to a Timestamp.
 -/
 def apply (timestamp : Timestamp) (transition : Transition) : Timestamp :=
-  let offsetInSeconds := transition.localTimeType.gmtOffset.second |>.add transition.localTimeType.gmtOffset.second
+  let offsetInSeconds := transition.localTimeType.gmtOffset.second
   timestamp.addSeconds offsetInSeconds
 
 /--
@@ -159,7 +159,7 @@ If the timestamp falls between two transitions, it returns the most recent trans
 -/
 def findTransitionForTimestamp (transitions : Array Transition) (timestamp : Timestamp) : Option Transition :=
   if let some idx := findTransitionIndexForTimestamp transitions timestamp
-    then transitions[idx - 1]?
+    then if idx == 0 then none else transitions[idx - 1]?
     else transitions.back?
 
 /--
@@ -206,6 +206,21 @@ def findLocalTimeTypeForTimestamp (zr : ZoneRules) (timestamp : Timestamp) : Loc
   Transition.findTransitionForTimestamp zr.transitions timestamp
   |>.map (·.localTimeType)
   |>.getD zr.initialLocalTimeType
+
+/--
+Finds the `LocalTimeType` for a given wall-clock time (seconds since Unix epoch in local time).
+Unlike `findLocalTimeTypeForTimestamp`, this compares each transition's UTC time adjusted by the
+previous offset — necessary when converting local time to UTC.
+-/
+def findLocalTimeTypeForWallTime (zr : ZoneRules) (wallSecs : Int) : LocalTimeType :=
+  let (ltt, _) := zr.transitions.foldl (init := (zr.initialLocalTimeType, false))
+    fun (ltt, done) t =>
+      if done then (ltt, true)
+      else
+        let localTransitionTime := t.time.add ltt.gmtOffset.second
+        if wallSecs < localTransitionTime.val then (ltt, true)
+        else (t.localTimeType, false)
+  ltt
 
 /--
 Find the current `TimeZone` out of a `Transition` in a `ZoneRules`

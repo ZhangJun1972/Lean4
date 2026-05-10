@@ -143,8 +143,8 @@ Converts a `Duration` to a `Millisecond.Offset`
 @[inline]
 def toMilliseconds (duration : Duration) : Millisecond.Offset :=
   let secMillis := duration.second.mul 1000
-  let nanosMillis := duration.nano.ediv 1000000 (by decide)
-  let millis := secMillis + (.ofInt nanosMillis.val)
+  let nanosMillis := duration.nano.val.tdiv 1000000
+  let millis := secMillis + (.ofInt nanosMillis)
   millis
 
 /--

@@ -212,11 +212,13 @@ def ofFin (data : Fin 13) : Ordinal :=
   Bounded.LE.ofFin' data (by decide)
 
 /--
-Transforms `Month.Ordinal` into `Second.Offset`.
+Transforms `Month.Ordinal` into `Second.Offset`, representing the number of seconds elapsed since
+the beginning of the year up to the start of the given month. For example, January returns 0
+seconds since it is the first month of the year.
 -/
 def toSeconds (leap : Bool) (month : Ordinal) : Second.Offset :=
   let daysAcc := #[0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-  let days : Day.Offset := daysAcc[month.toNat]!
+  let days : Day.Offset := daysAcc[month.toNat - 1]!
   let time := days.toSeconds
   if leap && month.toNat ≥ 2
     then time + 86400

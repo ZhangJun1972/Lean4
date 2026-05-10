@@ -53,3 +53,48 @@ info: true
 -/
 #guard_msgs in
 #eval (t + dur - dur) == t
+
+-- Duration.toMilliseconds uses truncation division (consistent with ofNanoseconds).
+-- Negative sub-millisecond values round toward zero, not toward negative infinity.
+
+/--
+info: 0
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds (-999999)).toMilliseconds.val
+
+/--
+info: 0
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds (-1)).toMilliseconds.val
+
+/--
+info: -1
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds (-1000000)).toMilliseconds.val
+
+/--
+info: -1
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds (-1999999)).toMilliseconds.val
+
+/--
+info: 0
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds 999999).toMilliseconds.val
+
+/--
+info: 1
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds 1000000).toMilliseconds.val
+
+/--
+info: 1
+-/
+#guard_msgs in
+#eval (Duration.ofNanoseconds 1999999).toMilliseconds.val

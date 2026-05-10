@@ -98,3 +98,13 @@ info: zoned("2014-06-16T10:03:03.000000002-03:00")
 -/
 #guard_msgs in
 #eval date₁.withNanoseconds 2
+
+-- PlainTime.withMilliseconds preserves microseconds (uses emod 1000000, not emod 1000).
+-- nanosecond=123456789 → 123 ms + 456 µs + 789 ns; setting millis=5 → 5456789 ns.
+/--
+info: 5456789
+-/
+#guard_msgs in
+#eval
+  let t := PlainTime.ofHourMinuteSecondsNano 10 30 ⟨0, by decide⟩ ⟨123456789, by decide⟩
+  (t.withMilliseconds ⟨5, by decide⟩).nanosecond.val

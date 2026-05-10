@@ -84,7 +84,7 @@ info: "2024-08-16T01:28:00.000000000Z"
     ISO8601UTC.format t.toDateTime
 
 /--
-info: "0000-12-31T22:28:12.000000000+09:00"
+info: "0000-01-01T22:28:12.000000000+09:00"
 -/
 #guard_msgs in
 #eval
@@ -92,7 +92,7 @@ info: "0000-12-31T22:28:12.000000000+09:00"
     ISO8601UTC.format (t.toDateTime.convertTimeZone jpTZ)
 
 /--
-info: "0000-12-31T00:00:00.000000000-03:00"
+info: "0000-01-01T00:00:00.000000000-03:00"
 -/
 #guard_msgs in
 #eval
@@ -202,3 +202,31 @@ info: Except.error "offset 13: need a natural number in the interval of 1 to 12"
 #eval
     let t2 := Full12HourWrong.parse "05/10/1993 20:30:23 PM +03:00"
     (ISO8601UTC.format ·.toDateTime) <$> t2
+
+-- 12-hour clock (`h`) without AM/PM marker: the parsed hour is used as-is (AM assumed).
+def fmtH12NoAmPm : GenericFormat .any := datespec("hh:mm:ss")
+def fmtH12NoAmPmFull : GenericFormat .any := datespec("uuuu-MM-dd hh:mm:ss")
+
+/--
+info: "0000-01-01T05:30:00.000000000Z"
+-/
+#guard_msgs in
+#eval
+  let t : ZonedDateTime := fmtH12NoAmPm.parse! "05:30:00"
+  ISO8601UTC.format t.toDateTime
+
+/--
+info: "0000-01-01T11:45:20.000000000Z"
+-/
+#guard_msgs in
+#eval
+  let t : ZonedDateTime := fmtH12NoAmPm.parse! "11:45:20"
+  ISO8601UTC.format t.toDateTime
+
+/--
+info: "2024-08-15T09:15:00.000000000Z"
+-/
+#guard_msgs in
+#eval
+  let t : ZonedDateTime := fmtH12NoAmPmFull.parse! "2024-08-15 09:15:00"
+  ISO8601UTC.format t.toDateTime
