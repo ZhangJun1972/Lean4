@@ -41,3 +41,7 @@ fail with `Unknown constant` in this public theorem signature. -/
 public theorem hmulDefaultPrivacy (m : Nat) : ∀ n, m * n = m * n := by
   intro n
   rfl
+
+public structure StructWithPrivImportedFieldType where
+  private field : Struct
+deriving Inhabited

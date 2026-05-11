@@ -41,6 +41,8 @@ public structure TrivialStructureInfo where
 Return `some fieldIdx` if `declName` is the name of an inductive datatype s.t.
 - It does not have builtin support in the runtime.
 - It has only one constructor.
+  - The constructor must be as visible as the type, otherwise the compiler may attempt to access
+    not-imported data.
 - This constructor has only one computationally relevant field.
 -/
 public def Irrelevant.hasTrivialStructure?
@@ -57,6 +59,7 @@ where fillCache : CoreM (Option TrivialStructureInfo) := do
   let .inductInfo info ← getConstInfo declName | return none
   if info.isUnsafe || info.isRec then return none
   let [ctorName] := info.ctors | return none
+  if isPrivateName ctorName && !isPrivateName declName then return none
   let ctorType ← getOtherDeclBaseType ctorName []
   if ctorType.isErased then return none
   let mask ← getRelevantCtorFields ctorName trivialType

@@ -72,6 +72,10 @@ where fillCache : CoreM Expr := do
       let numCtors := ctorNames.length
       let mut numScalarCtors := 0
       for ctorName in ctorNames do
+        if isPrivateName ctorName && !isPrivateName name then
+          -- If the constructor is private but the type is not, we cannot access the constructor's
+          -- fields and thus must assume it has a non-scalar layout.
+          return ImpureType.tobject
         let some (.ctorInfo ctorInfo) := env.find? ctorName | unreachable!
         let hasRelevantField ← Meta.MetaM.run' <|
                                Meta.forallTelescope ctorInfo.type fun params _ => do

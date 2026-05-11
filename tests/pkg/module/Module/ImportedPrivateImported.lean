@@ -15,3 +15,6 @@ public import Module.PrivateImported
 
 /-! #12833: namespaces privately imported but publicly used must be re-exported. -/
 open Namespaced
+
+set_option trace.Compiler true
+def f : StructWithPrivImportedFieldType := default
