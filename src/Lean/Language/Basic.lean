@@ -13,6 +13,7 @@ module
 prelude
 public import Lean.Parser.Types
 public import Lean.Util.Trace
+import Lean.Elab.InfoTree.Basic
 
 public section
 
@@ -213,19 +214,60 @@ structure SnapshotTree where
 deriving Inhabited, TypeName
 
 /--
+Transform applied while constructing a `SnapshotTree` from a typed snapshot hierarchy. Currently
+only carries the trailing whitespace to be appended to info-tree syntax at the boundaries of
+incrementally elaborated regions. -/
+structure SnapshotTreeTransform where
+  private addTrailing : Substring.Raw
+deriving Inhabited
+
+/-- Reader monad threading a `SnapshotTreeTransform` through `SnapshotTree` construction. -/
+abbrev ToSnapshotTreeM (α : Type) := ReaderT SnapshotTreeTransform Id α
+
+/-- Applies the current `SnapshotTreeTransform` to a `Snapshot`'s info tree. -/
+def Snapshot.transform (s : Snapshot) : ToSnapshotTreeM Snapshot :=
+  return { s with infoTree? := s.infoTree?.map (·.addTrailing (← read).addTrailing) }
+
+/-- Applies the current `SnapshotTreeTransform` to a `SnapshotTree` and recursively to its children. -/
+partial def SnapshotTree.transform (t : SnapshotTree) : ToSnapshotTreeM SnapshotTree := do
+  let element ← Snapshot.transform t.element
+  let trans ← read
+  let children := t.children.map fun child =>
+    SnapshotTask.map child (·.transform trans) (sync := true)
+  return { element, children }
+
+/--
   Helper class for projecting a heterogeneous hierarchy of snapshot classes to a homogeneous
   representation. -/
 class ToSnapshotTree (α : Type) where
   /-- Transforms a language-specific snapshot to a homogeneous snapshot tree. -/
-  toSnapshotTree : α → SnapshotTree
-export ToSnapshotTree (toSnapshotTree)
+  toSnapshotTreeM : α → ToSnapshotTreeM SnapshotTree
+export ToSnapshotTree (toSnapshotTreeM)
+
+/-- Converts a typed snapshot to a `SnapshotTree` using the default (identity) transform. -/
+def toSnapshotTree [ToSnapshotTree α] (a : α) : SnapshotTree :=
+  toSnapshotTreeM a |>.run default
+
+/--
+Lifts a typed `SnapshotTask` to a `SnapshotTree` task by mapping with `f`, applying the current
+transform when forced. Useful in recursive `ToSnapshotTree` instances, where the typeclass instance
+for the recursive type is not yet available and `f` is the local recursive function. -/
+def SnapshotTask.transformWith (t : SnapshotTask α)
+    (f : α → ToSnapshotTreeM SnapshotTree) :
+    ToSnapshotTreeM (SnapshotTask SnapshotTree) :=
+  return t.map (sync := true) (f · |>.run (← read))
+
+/-- Lifts a typed `SnapshotTask` to a `SnapshotTree` task, applying the current transform when forced. -/
+def SnapshotTask.transform [ToSnapshotTree α] (t : SnapshotTask α) :
+    ToSnapshotTreeM (SnapshotTask SnapshotTree) :=
+  t.transformWith toSnapshotTreeM
 
 instance : ToSnapshotTree SnapshotTree where
-  toSnapshotTree s := s
+  toSnapshotTreeM s := s.transform
 
 instance [ToSnapshotTree α] : ToSnapshotTree (Option α) where
-  toSnapshotTree
-    | some a => toSnapshotTree a
+  toSnapshotTreeM
+    | some a => toSnapshotTreeM a
     | none   => default
 
 /--
@@ -244,7 +286,7 @@ instance : Inhabited SnapshotLeaf where
   default := { toSnapshot := default }
 
 instance : ToSnapshotTree SnapshotLeaf where
-  toSnapshotTree s := SnapshotTree.mk s.toSnapshot #[]
+  toSnapshotTreeM s := return SnapshotTree.mk (← s.toSnapshot.transform) #[]
 
 /-- Arbitrary snapshot type, used for extensibility. -/
 structure DynamicSnapshot where
@@ -256,15 +298,15 @@ structure DynamicSnapshot where
   `(sync := true)` when accessing only after elaboration has finished. Early access can even lead to
   deadlocks when later forcing these unnecessary tasks on a starved thread pool.
   -/
-  tree : Thunk SnapshotTree
+  toSnapshotTreeM : ToSnapshotTreeM SnapshotTree
 
 instance : ToSnapshotTree DynamicSnapshot where
-  toSnapshotTree s := s.tree.get
+  toSnapshotTreeM s := s.toSnapshotTreeM
 
 /-- Creates a `DynamicSnapshot` from a typed snapshot value. -/
 def DynamicSnapshot.ofTyped [TypeName α] [ToSnapshotTree α] (val : α) : DynamicSnapshot where
   val := .mk val
-  tree := ToSnapshotTree.toSnapshotTree val
+  toSnapshotTreeM := ToSnapshotTree.toSnapshotTreeM val
 
 /-- Returns the original snapshot value if it is of the given type. -/
 def DynamicSnapshot.toTyped? (α : Type) [TypeName α] (snap : DynamicSnapshot) :

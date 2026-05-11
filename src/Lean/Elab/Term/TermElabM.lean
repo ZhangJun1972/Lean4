@@ -237,7 +237,7 @@ instance : Inhabited TacticFinishedSnapshot where
   default := { toSnapshot := default, state? := default, moreSnaps := default }
 
 instance : ToSnapshotTree TacticFinishedSnapshot where
-  toSnapshotTree s := ⟨s.toSnapshot, s.moreSnaps⟩
+  toSnapshotTreeM s := return ⟨← Snapshot.transform s.toSnapshot, ← s.moreSnaps.mapM (·.transform)⟩
 
 /-- Snapshot just before execution of a tactic. -/
 structure TacticParsedSnapshot extends Language.Snapshot where
@@ -254,11 +254,12 @@ instance : Inhabited TacticParsedSnapshot where
   default := { toSnapshot := default, stx := default, finished := default }
 
 partial instance : ToSnapshotTree TacticParsedSnapshot where
-  toSnapshotTree := go where
-    go := fun s => ⟨s.toSnapshot,
-      s.inner?.toArray.map (·.map (sync := true) go) ++
-      #[s.finished.map (sync := true) toSnapshotTree] ++
-      s.next.map (·.map (sync := true) go)⟩
+  toSnapshotTreeM := go where
+    go s := withReader _ do
+      return ⟨← Snapshot.transform s.toSnapshot,
+        (← s.inner?.toArray.mapM (·.transformWith go)) ++
+        #[← s.finished.transform] ++
+        (← s.next.mapM (·.transformWith go))⟩
 
 end Snapshot
 end Tactic

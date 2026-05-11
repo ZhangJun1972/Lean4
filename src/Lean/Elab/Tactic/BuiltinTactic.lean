@@ -45,7 +45,8 @@ where
       if let some snap := (← readThe Term.Context).tacSnap? then
         snap.new.resolve default
       return
-    let tac := stx[0]
+    let untrimmedTac := stx[0]
+    let tac := untrimmedTac.unsetTrailing
     /-
     Each `goEven` step creates three promises under incrementality and reuses their older versions
     where possible:
@@ -66,8 +67,8 @@ where
       if let some old := snap.old? then
         let oldParsed := old.val.get
         oldInner? := oldParsed.inner? |>.map (⟨oldParsed.stx, ·⟩)
-    -- compare `stx[0]` for `finished`/`next` reuse, focus on remainder of script
-    Term.withNarrowedTacticReuse (stx := stx) (fun stx => (stx[0], mkNullNode stx.getArgs[1...*])) fun stxs => do
+    -- compare `tac` for `finished`/`next` reuse, focus on remainder of script
+    Term.withNarrowedTacticReuse (stx := stx) (fun stx => (stx[0].unsetTrailing, mkNullNode stx.getArgs[1...*])) fun stxs => do
       let some snap := (← readThe Term.Context).tacSnap?
         | do evalTactic tac; goOdd stxs
       let mut reusableResult? := none
@@ -87,7 +88,7 @@ where
       snap.new.resolve {
         desc := tac.getKind.toString
         diagnostics := .empty
-        stx := tac
+        stx := untrimmedTac
         inner? := some { stx? := tac, task := inner.resultD default, cancelTk? }
         finished := {
           stx? := tac, task := finished.resultD default, cancelTk?
@@ -109,6 +110,7 @@ where
       -- producing at most one info tree as otherwise `getInfoTreeWithContext?` would panic.
       let trees ← getResetInfoTrees
       try
+        withTacticInfoContext untrimmedTac do  -- TODO: make some more specific info kind?
         let (_, state) ← withRestoreOrSaveFull reusableResult?
             -- set up nested reuse; `evalTactic` will check for `isIncrementalElab`
             (tacSnap? := some { old? := oldInner?, new := inner }) do
